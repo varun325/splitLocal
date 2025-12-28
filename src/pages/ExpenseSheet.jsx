@@ -235,9 +235,9 @@ function ExpenseSheet() {
     }]);
   };
 
-  const updateExpense = (id, field, value) => {
-    setExpenses(expenses.map(exp =>
-      exp.id === id ? { ...exp, [field]: value } : exp
+  const updateExpense = (id, field, value, extras = {}) => {
+    setExpenses((prev) => prev.map((exp) =>
+      exp.id === id ? { ...exp, [field]: value, ...extras } : exp
     ));
   };
 
@@ -604,6 +604,12 @@ function ExpenseSheet() {
                                     return;
                                   }
                                   if (value === '__split_between__') {
+                                    updateExpense(
+                                      expense.id,
+                                      'paidBy',
+                                      'Split Between',
+                                      { splitParties: Array.isArray(expense.splitParties) && expense.splitParties.length > 0 ? expense.splitParties : parties }
+                                    );
                                     openSplitBetween(expense.id);
                                     return;
                                   }
