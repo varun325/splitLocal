@@ -1,13 +1,81 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Download, GripVertical, Trash2, Plus } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { Box, Button, IconButton, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ReceiptLongOutlinedIcon from '@mui/icons-material/ReceiptLongOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
+import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
 import './ExpenseSheet.css';
+import { loadAppData, patchAppData } from '../storage/splitMoneyStore';
 
-const EXPENSE_TYPES = ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'];
-const COLORS = ['#000000', '#3c3c3c', '#6e6e6e', '#a0a0a0', '#d1d1d1', '#e8e8e8'];
+import {
+  red,
+  pink,
+  purple,
+  deepPurple,
+  indigo,
+  blue,
+  lightBlue,
+  cyan,
+  teal,
+  green,
+  lightGreen,
+  lime,
+  yellow,
+  amber,
+  orange,
+  deepOrange,
+  brown,
+} from '@mui/material/colors';
+
+const DEFAULT_EXPENSE_TYPES = ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'];
+
+const SWATCHES = [
+  red[700],
+  pink[600],
+  purple[600],
+  deepPurple[600],
+  indigo[600],
+  blue[700],
+  lightBlue[700],
+  cyan[700],
+  teal[700],
+  green[700],
+  lightGreen[700],
+  lime[800],
+  yellow[800],
+  amber[800],
+  orange[800],
+  deepOrange[800],
+  brown[600],
+];
+
+const hashString = (value) => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+};
+
+const buildTypeColorMap = (typeNames) => {
+  const names = Array.from(new Set(typeNames.filter(Boolean)));
+  if (names.length === 0) return {};
+  const start = hashString(names.join('|')) % SWATCHES.length;
+  const map = {};
+  names.forEach((name, index) => {
+    map[name] = SWATCHES[(start + index) % SWATCHES.length];
+  });
+  return map;
+};
 
 const formatINR = (amount) => {
   const value = Number(amount) || 0;
@@ -17,17 +85,69 @@ const formatINR = (amount) => {
 function ExpenseSheet() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { parties = [], expenses: importedExpenses = [] } = location.state || {};
+  const locationState = location.state || {};
+  const initialParties = Array.isArray(locationState.parties) ? locationState.parties : [];
+  const importedExpenses = Array.isArray(locationState.expenses) ? locationState.expenses : [];
+
+  const [parties, setParties] = useState(initialParties);
+
+  const [expenseTypes, setExpenseTypes] = useState(() => {
+    const importedTypes = (importedExpenses || []).map((e) => e?.type).filter(Boolean);
+    return Array.from(new Set([...DEFAULT_EXPENSE_TYPES, ...importedTypes]));
+  });
+
+  const [newTypeForExpenseId, setNewTypeForExpenseId] = useState(null);
+  const [newTypeName, setNewTypeName] = useState('');
+
+  const [newPartyForExpenseId, setNewPartyForExpenseId] = useState(null);
+  const [newPartyName, setNewPartyName] = useState('');
 
   const [expenses, setExpenses] = useState(importedExpenses.length > 0 ? importedExpenses : [
-    { id: '1', name: '', cost: '', paidBy: '', type: 'Food' }
+    { id: '1', name: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }
   ]);
 
   useEffect(() => {
-    if (!parties || parties.length === 0) {
-      navigate('/');
-    }
-  }, [parties, navigate]);
+    let cancelled = false;
+    (async () => {
+      if (initialParties.length > 0) return;
+      try {
+        const saved = await loadAppData();
+        if (cancelled) return;
+        if (!saved) {
+          navigate('/');
+          return;
+        }
+
+        const savedParties = Array.isArray(saved.parties) ? saved.parties : [];
+        const savedExpenses = Array.isArray(saved.expenses) ? saved.expenses : [];
+        const savedTypes = Array.isArray(saved.expenseTypes) ? saved.expenseTypes : [];
+
+        if (savedParties.length > 0) {
+          setParties(savedParties);
+          if (savedExpenses.length > 0) setExpenses(savedExpenses);
+          if (savedTypes.length > 0) {
+            setExpenseTypes(Array.from(new Set([...DEFAULT_EXPENSE_TYPES, ...savedTypes])));
+          }
+        } else {
+          navigate('/');
+        }
+      } catch {
+        navigate('/');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialParties.length, navigate]);
+
+  useEffect(() => {
+    if (!parties || parties.length === 0) return;
+    const t = setTimeout(() => {
+      patchAppData({ parties, expenses, expenseTypes }).catch(() => {});
+    }, 350);
+    return () => clearTimeout(t);
+  }, [parties, expenses, expenseTypes]);
 
   const addExpense = () => {
     setExpenses([...expenses, {
@@ -35,7 +155,7 @@ function ExpenseSheet() {
       name: '',
       cost: '',
       paidBy: '',
-      type: 'Food'
+      type: expenseTypes[0] || 'Other'
     }]);
   };
 
@@ -103,6 +223,58 @@ function ExpenseSheet() {
     return Object.entries(breakdown).map(([name, value]) => ({ name, value }));
   };
 
+  const startCreateType = (expenseId) => {
+    setNewTypeForExpenseId(expenseId);
+    setNewTypeName('');
+  };
+
+  const cancelCreateType = () => {
+    setNewTypeForExpenseId(null);
+    setNewTypeName('');
+  };
+
+  const confirmCreateType = () => {
+    const candidate = newTypeName.trim();
+    if (!candidate) return;
+    const exists = expenseTypes.some((t) => t.toLowerCase() === candidate.toLowerCase());
+    const finalType = exists ? expenseTypes.find((t) => t.toLowerCase() === candidate.toLowerCase()) : candidate;
+    if (!exists) {
+      setExpenseTypes((prev) => [...prev, candidate]);
+    }
+    if (newTypeForExpenseId) {
+      updateExpense(newTypeForExpenseId, 'type', finalType);
+    }
+    cancelCreateType();
+  };
+
+  const startCreateParty = (expenseId) => {
+    setNewPartyForExpenseId(expenseId);
+    setNewPartyName('');
+  };
+
+  const cancelCreateParty = () => {
+    setNewPartyForExpenseId(null);
+    setNewPartyName('');
+  };
+
+  const confirmCreateParty = () => {
+    const candidate = newPartyName.trim();
+    if (!candidate) return;
+
+    const exists = parties.some((p) => p.toLowerCase() === candidate.toLowerCase());
+    const finalParty = exists ? parties.find((p) => p.toLowerCase() === candidate.toLowerCase()) : candidate;
+
+    if (!exists) {
+      setParties((prev) => [...prev, candidate]);
+    }
+
+    if (newPartyForExpenseId) {
+      updateExpense(newPartyForExpenseId, 'paidBy', finalParty);
+    }
+
+    cancelCreateParty();
+  };
+
   const exportToExcel = () => {
     const exportData = expenses.map(exp => ({
       'Expense Name': exp.name,
@@ -120,7 +292,8 @@ function ExpenseSheet() {
   const exportToJSON = () => {
     const data = {
       parties,
-      expenses
+      expenses,
+      expenseTypes,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -133,6 +306,7 @@ function ExpenseSheet() {
 
   const partyTotals = calculatePartyTotals();
   const typeBreakdown = calculateTypeBreakdown();
+  const typeColorMap = buildTypeColorMap(typeBreakdown.map((t) => t.name));
   const totalExpenses = expenses.reduce((sum, exp) => sum + (parseFloat(exp.cost) || 0), 0);
 
   if (!parties || parties.length === 0) {
@@ -143,18 +317,37 @@ function ExpenseSheet() {
     <div className="expense-sheet">
       <div className="sheet-header">
         <div>
-          <h1>Expense Tracker</h1>
+          <div className="sheet-title">
+            <ReceiptLongOutlinedIcon sx={{ color: 'var(--color-primary)' }} />
+            <Typography variant="h3" component="h1">Expense Tracker</Typography>
+          </div>
           <p className="subtitle">{parties.length} parties tracking expenses</p>
         </div>
         <div className="header-actions">
-          <button onClick={exportToExcel} className="btn-export">
-            <Download size={18} />
-            <span>Export Excel</span>
-          </button>
-          <button onClick={exportToJSON} className="btn-export">
-            <Download size={18} />
-            <span>Save Data</span>
-          </button>
+          <Button
+            onClick={() => navigate('/')}
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+          >
+            Back
+          </Button>
+          <Button
+            onClick={exportToExcel}
+            variant="outlined"
+            startIcon={<FileDownloadOutlinedIcon />}
+            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+          >
+            Export Excel
+          </Button>
+          <Button
+            onClick={exportToJSON}
+            variant="outlined"
+            startIcon={<SaveOutlinedIcon />}
+            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+          >
+            Save Data
+          </Button>
         </div>
       </div>
 
@@ -186,55 +379,137 @@ function ExpenseSheet() {
                           className="expense-row"
                         >
                           <div className="col-drag" {...provided.dragHandleProps}>
-                            <GripVertical size={18} />
+                            <DragIndicatorIcon fontSize="small" />
                           </div>
                           <div className="col-name">
-                            <input
-                              type="text"
+                            <TextField
                               value={expense.name}
                               onChange={(e) => updateExpense(expense.id, 'name', e.target.value)}
                               placeholder="Enter expense name"
+                              variant="outlined"
+                              size="small"
+                              fullWidth
+                              InputProps={{ sx: { borderRadius: 0 } }}
                             />
                           </div>
                           <div className="col-cost">
-                            <input
+                            <TextField
                               type="number"
                               value={expense.cost}
                               onChange={(e) => updateExpense(expense.id, 'cost', e.target.value)}
                               placeholder="0.00"
-                              step="0.01"
+                              variant="outlined"
+                              size="small"
+                              fullWidth
+                              inputProps={{ step: '0.01' }}
+                              InputProps={{ sx: { borderRadius: 0, fontFamily: 'Courier New, monospace' } }}
                             />
                           </div>
                           <div className="col-paidby">
-                            <select
-                              value={expense.paidBy}
-                              onChange={(e) => updateExpense(expense.id, 'paidBy', e.target.value)}
-                            >
-                              <option value="">Select...</option>
-                              <option value="Split Equally">Split Equally</option>
-                              {parties.map(party => (
-                                <option key={party} value={party}>{party}</option>
-                              ))}
-                            </select>
+                            {newPartyForExpenseId === expense.id ? (
+                              <Box className="new-type-inline">
+                                <TextField
+                                  value={newPartyName}
+                                  onChange={(e) => setNewPartyName(e.target.value)}
+                                  placeholder="New party"
+                                  variant="outlined"
+                                  size="small"
+                                  fullWidth
+                                  autoFocus
+                                  InputProps={{ sx: { borderRadius: 0 } }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') confirmCreateParty();
+                                    if (e.key === 'Escape') cancelCreateParty();
+                                  }}
+                                />
+                                <IconButton className="new-type-btn" onClick={confirmCreateParty} aria-label="Confirm party">
+                                  <CheckIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton className="new-type-btn" onClick={cancelCreateParty} aria-label="Cancel">
+                                  <CloseIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            ) : (
+                              <Select
+                                value={expense.paidBy}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (value === '__add_new_party__') {
+                                    startCreateParty(expense.id);
+                                    return;
+                                  }
+                                  updateExpense(expense.id, 'paidBy', value);
+                                }}
+                                size="small"
+                                fullWidth
+                                displayEmpty
+                                sx={{ borderRadius: 0 }}
+                              >
+                                <MenuItem value=""><em>Select…</em></MenuItem>
+                                <MenuItem value="Split Equally">Split Equally</MenuItem>
+                                {parties.map((party) => (
+                                  <MenuItem key={party} value={party}>{party}</MenuItem>
+                                ))}
+                                <MenuItem value="__add_new_party__"><em>+ Add new party…</em></MenuItem>
+                              </Select>
+                            )}
                           </div>
                           <div className="col-type">
-                            <select
-                              value={expense.type}
-                              onChange={(e) => updateExpense(expense.id, 'type', e.target.value)}
-                            >
-                              {EXPENSE_TYPES.map(type => (
-                                <option key={type} value={type}>{type}</option>
-                              ))}
-                            </select>
+                            {newTypeForExpenseId === expense.id ? (
+                              <Box className="new-type-inline">
+                                <TextField
+                                  value={newTypeName}
+                                  onChange={(e) => setNewTypeName(e.target.value)}
+                                  placeholder="New type"
+                                  variant="outlined"
+                                  size="small"
+                                  fullWidth
+                                  autoFocus
+                                  InputProps={{ sx: { borderRadius: 0 } }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') confirmCreateType();
+                                    if (e.key === 'Escape') cancelCreateType();
+                                  }}
+                                />
+                                <IconButton className="new-type-btn" onClick={confirmCreateType} aria-label="Confirm type">
+                                  <CheckIcon fontSize="small" />
+                                </IconButton>
+                                <IconButton className="new-type-btn" onClick={cancelCreateType} aria-label="Cancel">
+                                  <CloseIcon fontSize="small" />
+                                </IconButton>
+                              </Box>
+                            ) : (
+                              <Select
+                                value={expense.type}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (value === '__add_new_type__') {
+                                    startCreateType(expense.id);
+                                    return;
+                                  }
+                                  updateExpense(expense.id, 'type', value);
+                                }}
+                                size="small"
+                                fullWidth
+                                sx={{ borderRadius: 0 }}
+                              >
+                                {expenseTypes.map((type) => (
+                                  <MenuItem key={type} value={type}>{type}</MenuItem>
+                                ))}
+                                <MenuItem value="__add_new_type__"><em>+ Add new type…</em></MenuItem>
+                              </Select>
+                            )}
                           </div>
                           <div className="col-actions">
-                            <button
+                            <IconButton
                               onClick={() => removeExpense(expense.id)}
                               className="btn-delete"
                               disabled={expenses.length === 1}
+                              aria-label="Delete expense"
+                              size="small"
                             >
-                              <Trash2 size={16} />
-                            </button>
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
                           </div>
                         </div>
                       )}
@@ -246,10 +521,21 @@ function ExpenseSheet() {
             </Droppable>
           </DragDropContext>
 
-          <button onClick={addExpense} className="btn-add-expense">
-            <Plus size={18} />
-            <span>Add Expense</span>
-          </button>
+          <Button
+            onClick={addExpense}
+            variant="outlined"
+            startIcon={<AddIcon />}
+            fullWidth
+            sx={{
+              mt: 2,
+              borderRadius: 0,
+              borderStyle: 'dashed',
+              borderColor: 'var(--color-gray-400)',
+              color: 'var(--color-gray-500)',
+            }}
+          >
+            Add Expense
+          </Button>
         </div>
 
         <div className="summary-section">
@@ -270,15 +556,30 @@ function ExpenseSheet() {
                     cx="50%"
                     cy="50%"
                     outerRadius={80}
-                    label={(entry) => `${entry.name}: ${formatINR(entry.value)}`}
                   >
                     {typeBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={typeColorMap[entry.name] || SWATCHES[index % SWATCHES.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => formatINR(value)} />
                 </PieChart>
               </ResponsiveContainer>
+
+              <div className="chart-legend" aria-label="Expense type legend">
+                {typeBreakdown
+                  .slice()
+                  .sort((a, b) => b.value - a.value)
+                  .map((item) => (
+                    <div key={item.name} className="legend-item">
+                      <span
+                        className="legend-swatch"
+                        style={{ backgroundColor: typeColorMap[item.name] || 'var(--color-primary)' }}
+                      />
+                      <span className="legend-name">{item.name}</span>
+                      <span className="legend-value">{formatINR(item.value)}</span>
+                    </div>
+                  ))}
+              </div>
             </div>
           )}
 

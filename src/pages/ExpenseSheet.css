@@ -17,6 +17,12 @@
   margin-bottom: var(--spacing-xs);
 }
 
+.sheet-title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 .header-actions {
   display: flex;
   gap: var(--spacing-md);
@@ -31,13 +37,13 @@
 
 .sheet-content {
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: 1fr 0.618fr;
   gap: var(--spacing-xl);
 }
 
 .expenses-section {
   background-color: var(--color-secondary);
-  border: var(--border-width) solid var(--color-primary);
+  border: var(--border-width) solid var(--color-border);
   padding: var(--spacing-lg);
 }
 
@@ -86,19 +92,13 @@
   cursor: grabbing;
 }
 
-.col-name input,
-.col-cost input,
-.col-paidby select,
-.col-type select {
-  width: 100%;
-  padding: var(--spacing-sm);
-  border: var(--border-width) solid var(--color-gray-300);
-  font-size: 0.875rem;
-}
-
-.col-cost input {
-  text-align: right;
-  font-family: 'Courier New', monospace;
+/* MUI inputs already provide sizing; keep grid alignment only */
+.col-name,
+.col-cost,
+.col-paidby,
+.col-type {
+  display: flex;
+  align-items: center;
 }
 
 .col-actions {
@@ -155,7 +155,7 @@
 
 .summary-card {
   background-color: var(--color-secondary);
-  border: var(--border-width) solid var(--color-primary);
+  border: var(--border-width) solid var(--color-border);
   padding: var(--spacing-lg);
 }
 
@@ -174,6 +174,55 @@
   font-family: 'Courier New', monospace;
   text-align: center;
   padding: var(--spacing-lg) 0;
+}
+
+.chart-legend {
+  margin-top: var(--spacing-md);
+  border-top: var(--border-width) solid var(--color-gray-200);
+  padding-top: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  max-height: 160px;
+  overflow: auto;
+}
+
+.legend-item {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border: var(--border-width) solid var(--color-gray-300);
+}
+
+.legend-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legend-value {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+}
+
+.new-type-inline {
+  display: grid;
+  grid-template-columns: 1fr 34px 34px;
+  gap: var(--spacing-xs);
+  align-items: center;
+  width: 100%;
+}
+
+.new-type-btn {
+  border: var(--border-width) solid var(--color-gray-300);
+  border-radius: 0;
 }
 
 .balance-list {

@@ -11,13 +11,21 @@
   width: 100%;
   max-width: 600px;
   background-color: var(--color-secondary);
-  border: var(--border-width) solid var(--color-primary);
+  border: var(--border-width) solid var(--color-border);
   padding: var(--spacing-2xl);
 }
 
 .header {
   margin-bottom: var(--spacing-2xl);
   text-align: center;
+}
+
+.title-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  margin-bottom: var(--spacing-sm);
 }
 
 .header h1 {

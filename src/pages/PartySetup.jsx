@@ -1,12 +1,43 @@
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Upload } from 'lucide-react';
+import { Box, Button, Container, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import { loadAppData, patchAppData } from '../storage/splitMoneyStore';
 import './PartySetup.css';
 
 function PartySetup() {
   const [parties, setParties] = useState(['']);
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const saved = await loadAppData();
+        if (cancelled || !saved) return;
+        if (Array.isArray(saved.parties) && saved.parties.length > 0) {
+          setParties(saved.parties);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const valid = parties.map((p) => p.trim()).filter(Boolean);
+    const t = setTimeout(() => {
+      patchAppData({ parties: valid.length > 0 ? valid : [] }).catch(() => {});
+    }, 300);
+    return () => clearTimeout(t);
+  }, [parties]);
 
   const addParty = () => {
     setParties([...parties, '']);
@@ -27,6 +58,7 @@ function PartySetup() {
   const handleGo = () => {
     const validParties = parties.filter(p => p.trim() !== '');
     if (validParties.length >= 2) {
+      patchAppData({ parties: validParties }).catch(() => {});
       navigate('/expenses', { state: { parties: validParties } });
     } else {
       alert('Please add at least 2 parties');
@@ -52,67 +84,114 @@ function PartySetup() {
   };
 
   return (
-    <div className="party-setup">
-      <div className="setup-container">
-        <div className="header">
-          <h1>Split Money</h1>
-          <p className="subtitle">Add parties to start tracking expenses</p>
-        </div>
+    <Box className="party-setup">
+      <Container maxWidth="sm">
+        <Paper className="setup-container" elevation={0}>
+          <Box className="header">
+            <Box className="title-row">
+              <GroupsOutlinedIcon sx={{ color: 'var(--color-primary)' }} />
+              <Typography variant="h2" component="h1">Split Money</Typography>
+            </Box>
+            <Typography className="subtitle">Add parties to start tracking expenses</Typography>
+          </Box>
 
-        <div className="party-form">
-          <div className="party-list">
-            {parties.map((party, index) => (
-              <div key={index} className="party-input-row">
-                <input
-                  type="text"
-                  value={party}
-                  onChange={(e) => updateParty(index, e.target.value)}
-                  placeholder={`Party ${index + 1}`}
-                  className="party-input"
-                />
-                {parties.length > 1 && (
-                  <button
-                    onClick={() => removeParty(index)}
-                    className="btn-icon"
-                    aria-label="Remove party"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+          <Box className="party-form">
+            <Stack className="party-list" spacing={2}>
+              {parties.map((party, index) => (
+                <Box key={index} className="party-input-row">
+                  <TextField
+                    value={party}
+                    onChange={(e) => updateParty(index, e.target.value)}
+                    placeholder={`Party ${index + 1}`}
+                    variant="outlined"
+                    fullWidth
+                    size="medium"
+                    InputProps={{
+                      sx: {
+                        borderRadius: 0,
+                        backgroundColor: 'var(--color-secondary)',
+                      },
+                    }}
+                  />
+                  {parties.length > 1 && (
+                    <IconButton
+                      onClick={() => removeParty(index)}
+                      aria-label="Remove party"
+                      sx={{
+                        border: 'var(--border-width) solid var(--color-primary)',
+                        borderRadius: 0,
+                        color: 'var(--color-ink)',
+                        width: 48,
+                        height: 48,
+                      }}
+                    >
+                      <DeleteOutlineIcon />
+                    </IconButton>
+                  )}
+                </Box>
+              ))}
+            </Stack>
 
-          <button onClick={addParty} className="btn-add">
-            <Plus size={20} />
-            <span>Add Party</span>
-          </button>
-        </div>
-
-        <div className="actions">
-          <button onClick={handleGo} className="btn-primary">
-            Go
-          </button>
-          
-          <div className="import-section">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleImport}
-              style={{ display: 'none' }}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="btn-secondary"
+            <Button
+              onClick={addParty}
+              variant="outlined"
+              startIcon={<AddIcon />}
+              fullWidth
+              sx={{
+                mt: 2,
+                borderRadius: 0,
+                borderStyle: 'dashed',
+                borderColor: 'var(--color-gray-400)',
+                color: 'var(--color-gray-500)',
+              }}
             >
-              <Upload size={20} />
-              <span>Import Data</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+              Add Party
+            </Button>
+          </Box>
+
+          <Stack className="actions" spacing={2}>
+            <Button
+              onClick={handleGo}
+              variant="contained"
+              sx={{
+                borderRadius: 0,
+                backgroundColor: 'var(--color-primary)',
+                color: 'var(--color-secondary)',
+                '&:hover': { backgroundColor: 'var(--color-primary)' },
+                py: 1.5,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Go
+            </Button>
+
+            <Box className="import-section">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                style={{ display: 'none' }}
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outlined"
+                startIcon={<UploadFileIcon />}
+                fullWidth
+                sx={{
+                  borderRadius: 0,
+                  borderColor: 'var(--color-primary)',
+                  color: 'var(--color-ink)',
+                }}
+              >
+                Import Data
+              </Button>
+            </Box>
+          </Stack>
+        </Paper>
+      </Container>
+    </Box>
   );
 }
 
