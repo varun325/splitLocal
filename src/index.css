@@ -1,0 +1,142 @@
+/* Swiss Design System */
+:root {
+  /* Swiss Design Color Palette */
+  --color-primary: #000000;
+  --color-secondary: #ffffff;
+  --color-accent: #ff0000;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e8e8e8;
+  --color-gray-300: #d1d1d1;
+  --color-gray-400: #a0a0a0;
+  --color-gray-500: #6e6e6e;
+  --color-gray-600: #3c3c3c;
+  
+  /* Typography */
+  --font-primary: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  
+  /* Border */
+  --border-width: 1px;
+  --border-radius: 0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-primary);
+  font-weight: var(--font-weight-regular);
+  background-color: var(--color-gray-100);
+  color: var(--color-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+  margin-bottom: var(--spacing-md);
+}
+
+h1 {
+  font-size: 2.5rem;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 2rem;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 1.5rem;
+}
+
+button {
+  font-family: var(--font-primary);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  border: var(--border-width) solid var(--color-primary);
+  background-color: var(--color-secondary);
+  color: var(--color-primary);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--border-radius);
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.875rem;
+}
+
+button:hover {
+  background-color: var(--color-primary);
+  color: var(--color-secondary);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button.primary {
+  background-color: var(--color-primary);
+  color: var(--color-secondary);
+}
+
+button.primary:hover {
+  background-color: var(--color-gray-600);
+}
+
+input, select, textarea {
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: var(--border-width) solid var(--color-gray-300);
+  border-radius: var(--border-radius);
+  background-color: var(--color-secondary);
+  color: var(--color-primary);
+  transition: border-color 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--spacing-xl);
+}
+
+/* Swiss Grid System */
+.grid {
+  display: grid;
+  gap: var(--spacing-md);
+}
+
+.flex {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.flex-center {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
