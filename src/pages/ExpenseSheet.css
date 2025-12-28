@@ -49,7 +49,7 @@
 
 .table-header {
   display: grid;
-  grid-template-columns: 40px 2fr 120px 150px 150px 50px;
+  grid-template-columns: 44px 40px 2fr 120px 150px 150px 50px;
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   background-color: var(--color-primary);
@@ -67,13 +67,20 @@
 
 .expense-row {
   display: grid;
-  grid-template-columns: 40px 2fr 120px 150px 150px 50px;
+  grid-template-columns: 44px 40px 2fr 120px 150px 150px 50px;
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   border-bottom: var(--border-width) solid var(--color-gray-200);
   align-items: center;
   background-color: var(--color-secondary);
   transition: background-color 0.2s;
+}
+
+.col-serial {
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
+  color: var(--color-gray-500);
+  text-align: right;
 }
 
 .expense-row:hover {
@@ -282,7 +289,7 @@
 @media (max-width: 768px) {
   .table-header,
   .expense-row {
-    grid-template-columns: 30px 1fr 80px 100px 100px 40px;
+    grid-template-columns: 34px 30px 1fr 80px 100px 100px 40px;
     gap: var(--spacing-sm);
     font-size: 0.75rem;
   }

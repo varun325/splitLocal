@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Box, Button, IconButton, MenuItem, Paper, Select, Stack, TextField, Typography } from '@mui/material';
+import {
+  Box,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  FormGroup,
+  IconButton,
+  MenuItem,
+  Select,
+  TextField,
+  Typography,
+} from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
@@ -11,6 +26,9 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
+import RemoveDoneIcon from '@mui/icons-material/RemoveDone';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
 import './ExpenseSheet.css';
@@ -101,6 +119,9 @@ function ExpenseSheet() {
 
   const [newPartyForExpenseId, setNewPartyForExpenseId] = useState(null);
   const [newPartyName, setNewPartyName] = useState('');
+
+  const [splitBetweenForExpenseId, setSplitBetweenForExpenseId] = useState(null);
+  const [splitBetweenSelection, setSplitBetweenSelection] = useState([]);
 
   const [expenses, setExpenses] = useState(importedExpenses.length > 0 ? importedExpenses : [
     { id: '1', name: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }
@@ -200,6 +221,19 @@ function ExpenseSheet() {
         return;
       }
 
+      if (paidBy === 'Split Between') {
+        const selected = Array.isArray(expense.splitParties) && expense.splitParties.length > 0
+          ? expense.splitParties
+          : parties;
+        const perPerson = cost / selected.length;
+        selected.forEach((party) => {
+          if (totals[party] !== undefined) {
+            totals[party].split += perPerson;
+          }
+        });
+        return;
+      }
+
       if (totals[paidBy] !== undefined) {
         totals[paidBy].direct += cost;
       }
@@ -275,12 +309,44 @@ function ExpenseSheet() {
     cancelCreateParty();
   };
 
+  const openSplitBetween = (expenseId) => {
+    const exp = expenses.find((e) => e.id === expenseId);
+    const existing = Array.isArray(exp?.splitParties) && exp.splitParties.length > 0 ? exp.splitParties : parties;
+    setSplitBetweenSelection(existing);
+    setSplitBetweenForExpenseId(expenseId);
+  };
+
+  const closeSplitBetween = () => {
+    setSplitBetweenForExpenseId(null);
+    setSplitBetweenSelection([]);
+  };
+
+  const toggleSplitParty = (party) => {
+    setSplitBetweenSelection((prev) =>
+      prev.includes(party) ? prev.filter((p) => p !== party) : [...prev, party],
+    );
+  };
+
+  const splitBetweenCheckAll = () => setSplitBetweenSelection(parties);
+  const splitBetweenUncheckAll = () => setSplitBetweenSelection([]);
+
+  const confirmSplitBetween = () => {
+    if (!splitBetweenForExpenseId) return;
+    if (splitBetweenSelection.length === 0) return;
+    updateExpense(splitBetweenForExpenseId, 'paidBy', 'Split Between');
+    updateExpense(splitBetweenForExpenseId, 'splitParties', splitBetweenSelection);
+    closeSplitBetween();
+  };
+
   const exportToExcel = () => {
     const exportData = expenses.map(exp => ({
       'Expense Name': exp.name,
       'Cost': exp.cost,
       'Paid By': exp.paidBy,
-      'Type': exp.type
+      'Type': exp.type,
+      'Split Parties': exp.paidBy === 'Split Between'
+        ? (Array.isArray(exp.splitParties) ? exp.splitParties.join(', ') : '')
+        : ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
@@ -354,6 +420,7 @@ function ExpenseSheet() {
       <div className="sheet-content">
         <div className="expenses-section">
           <div className="table-header">
+            <div className="col-serial">#</div>
             <div className="col-drag"></div>
             <div className="col-name">Expense Name</div>
             <div className="col-cost">Cost</div>
@@ -378,6 +445,7 @@ function ExpenseSheet() {
                           {...provided.draggableProps}
                           className="expense-row"
                         >
+                          <div className="col-serial">{index + 1}</div>
                           <div className="col-drag" {...provided.dragHandleProps}>
                             <DragIndicatorIcon fontSize="small" />
                           </div>
@@ -438,6 +506,10 @@ function ExpenseSheet() {
                                     startCreateParty(expense.id);
                                     return;
                                   }
+                                  if (value === '__split_between__') {
+                                    openSplitBetween(expense.id);
+                                    return;
+                                  }
                                   updateExpense(expense.id, 'paidBy', value);
                                 }}
                                 size="small"
@@ -447,9 +519,11 @@ function ExpenseSheet() {
                               >
                                 <MenuItem value=""><em>Select…</em></MenuItem>
                                 <MenuItem value="Split Equally">Split Equally</MenuItem>
+                                <MenuItem value="Split Between" sx={{ display: 'none' }}>Split Between</MenuItem>
                                 {parties.map((party) => (
                                   <MenuItem key={party} value={party}>{party}</MenuItem>
                                 ))}
+                                <MenuItem value="__split_between__"><em>Split Between…</em></MenuItem>
                                 <MenuItem value="__add_new_party__"><em>+ Add new party…</em></MenuItem>
                               </Select>
                             )}
@@ -612,6 +686,79 @@ function ExpenseSheet() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={Boolean(splitBetweenForExpenseId)}
+        onClose={closeSplitBetween}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <PeopleAltOutlinedIcon sx={{ color: 'var(--color-primary)' }} />
+          Split Between
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+            Choose which parties share this expense.
+          </Typography>
+
+          <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+            <Button
+              onClick={splitBetweenCheckAll}
+              size="small"
+              variant="outlined"
+              startIcon={<SelectAllIcon />}
+              sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+            >
+              Check all
+            </Button>
+            <Button
+              onClick={splitBetweenUncheckAll}
+              size="small"
+              variant="outlined"
+              startIcon={<RemoveDoneIcon />}
+              sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+            >
+              Uncheck all
+            </Button>
+          </Box>
+
+          <FormGroup>
+            {parties.map((party) => (
+              <FormControlLabel
+                key={party}
+                control={
+                  <Checkbox
+                    checked={splitBetweenSelection.includes(party)}
+                    onChange={() => toggleSplitParty(party)}
+                    sx={{ '&.Mui-checked': { color: 'var(--color-primary)' } }}
+                  />
+                }
+                label={party}
+              />
+            ))}
+          </FormGroup>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            onClick={closeSplitBetween}
+            variant="outlined"
+            startIcon={<CloseIcon />}
+            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmSplitBetween}
+            variant="contained"
+            startIcon={<CheckIcon />}
+            disabled={splitBetweenSelection.length === 0}
+            sx={{ borderRadius: 0, backgroundColor: 'var(--color-primary)' }}
+          >
+            Done
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
