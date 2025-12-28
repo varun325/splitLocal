@@ -5,6 +5,8 @@ import {
   Box,
   Button,
   Checkbox,
+  Snackbar,
+  Alert,
   Dialog,
   DialogActions,
   DialogContent,
@@ -29,10 +31,13 @@ import CloseIcon from '@mui/icons-material/Close';
 import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
 import SelectAllIcon from '@mui/icons-material/SelectAll';
 import RemoveDoneIcon from '@mui/icons-material/RemoveDone';
+import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
 import './ExpenseSheet.css';
-import { loadAppData, patchAppData } from '../storage/splitMoneyStore';
+import { loadSheet, saveSheet, sheetExists, renameSheet } from '../storage/splitMoneyStore';
+import SheetDrawer from '../components/SheetDrawer';
 
 import {
   red,
@@ -104,8 +109,15 @@ function ExpenseSheet() {
   const location = useLocation();
   const navigate = useNavigate();
   const locationState = location.state || {};
+  const initialSheetName = locationState.sheetName || '';
   const initialParties = Array.isArray(locationState.parties) ? locationState.parties : [];
   const importedExpenses = Array.isArray(locationState.expenses) ? locationState.expenses : [];
+
+  const [sheetName, setSheetName] = useState(initialSheetName);
+  const [sheetNameInput, setSheetNameInput] = useState(initialSheetName);
+  const [editingSheetName, setEditingSheetName] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [error, setError] = useState('');
 
   const [parties, setParties] = useState(initialParties);
 
@@ -129,46 +141,88 @@ function ExpenseSheet() {
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
-      if (initialParties.length > 0) return;
+      if (!sheetName) {
+        navigate('/');
+        return;
+      }
+
       try {
-        const saved = await loadAppData();
+        const stored = await loadSheet(sheetName);
         if (cancelled) return;
-        if (!saved) {
-          navigate('/');
-          return;
-        }
 
-        const savedParties = Array.isArray(saved.parties) ? saved.parties : [];
-        const savedExpenses = Array.isArray(saved.expenses) ? saved.expenses : [];
-        const savedTypes = Array.isArray(saved.expenseTypes) ? saved.expenseTypes : [];
-
-        if (savedParties.length > 0) {
-          setParties(savedParties);
-          if (savedExpenses.length > 0) setExpenses(savedExpenses);
-          if (savedTypes.length > 0) {
-            setExpenseTypes(Array.from(new Set([...DEFAULT_EXPENSE_TYPES, ...savedTypes])));
-          }
+        if (stored) {
+          setParties(Array.isArray(stored.parties) && stored.parties.length ? stored.parties : []);
+          setExpenses(Array.isArray(stored.expenses) && stored.expenses.length ? stored.expenses : [{ id: '1', name: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }]);
+          const storedTypes = Array.isArray(stored.expenseTypes) && stored.expenseTypes.length ? stored.expenseTypes : DEFAULT_EXPENSE_TYPES;
+          setExpenseTypes(Array.from(new Set([...DEFAULT_EXPENSE_TYPES, ...storedTypes])));
+        } else if (initialParties.length > 0) {
+          const mergedTypes = Array.from(new Set([...DEFAULT_EXPENSE_TYPES, ...(locationState.expenseTypes || [])]));
+          const initialExpenses = importedExpenses.length > 0 ? importedExpenses : [{ id: '1', name: '', cost: '', paidBy: '', type: mergedTypes[0] || DEFAULT_EXPENSE_TYPES[0] }];
+          setParties(initialParties);
+          setExpenses(initialExpenses);
+          setExpenseTypes(mergedTypes);
+          await saveSheet({ name: sheetName, parties: initialParties, expenses: initialExpenses, expenseTypes: mergedTypes });
         } else {
           navigate('/');
         }
       } catch {
-        navigate('/');
+        if (!cancelled) navigate('/');
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [initialParties.length, navigate]);
+  }, [sheetName, initialParties.length, importedExpenses.length, navigate, locationState.expenseTypes]);
 
   useEffect(() => {
-    if (!parties || parties.length === 0) return;
+    if (!sheetName) return;
     const t = setTimeout(() => {
-      patchAppData({ parties, expenses, expenseTypes }).catch(() => {});
-    }, 350);
+      saveSheet({ name: sheetName, parties, expenses, expenseTypes }).catch(() => {});
+    }, 400);
     return () => clearTimeout(t);
-  }, [parties, expenses, expenseTypes]);
+  }, [sheetName, parties, expenses, expenseTypes]);
+
+  const handleOpenDrawer = () => setDrawerOpen(true);
+  const handleCloseDrawer = () => setDrawerOpen(false);
+
+  const handleStartRename = () => {
+    setSheetNameInput(sheetName);
+    setEditingSheetName(true);
+  };
+
+  const handleCancelRename = () => {
+    setEditingSheetName(false);
+    setSheetNameInput(sheetName);
+  };
+
+  const handleConfirmRename = async () => {
+    const trimmed = sheetNameInput.trim();
+    if (!trimmed) {
+      setError('Sheet name is required');
+      return;
+    }
+    if (trimmed.toLowerCase() === sheetName.toLowerCase()) {
+      setEditingSheetName(false);
+      return;
+    }
+    const exists = await sheetExists(trimmed);
+    if (exists) {
+      setError('A sheet with this name already exists');
+      return;
+    }
+    try {
+      await renameSheet(sheetName, trimmed);
+      setSheetName(trimmed);
+      setEditingSheetName(false);
+    } catch {
+      setError('Could not rename sheet');
+    }
+  };
+
+  const handleCloseError = () => setError('');
 
   const addExpense = () => {
     setExpenses([...expenses, {
@@ -176,7 +230,8 @@ function ExpenseSheet() {
       name: '',
       cost: '',
       paidBy: '',
-      type: expenseTypes[0] || 'Other'
+      type: expenseTypes[0] || 'Other',
+      splitParties: parties
     }]);
   };
 
@@ -357,6 +412,7 @@ function ExpenseSheet() {
 
   const exportToJSON = () => {
     const data = {
+      name: sheetName,
       parties,
       expenses,
       expenseTypes,
@@ -388,8 +444,49 @@ function ExpenseSheet() {
             <Typography variant="h3" component="h1">Expense Tracker</Typography>
           </div>
           <p className="subtitle">{parties.length} parties tracking expenses</p>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+            <FolderOpenOutlinedIcon fontSize="small" sx={{ color: 'var(--color-primary)' }} />
+            {editingSheetName ? (
+              <>
+                <TextField
+                  value={sheetNameInput}
+                  onChange={(e) => setSheetNameInput(e.target.value)}
+                  size="small"
+                  variant="outlined"
+                  InputProps={{ sx: { borderRadius: 0, fontWeight: 700, minWidth: 180 } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleConfirmRename();
+                    if (e.key === 'Escape') handleCancelRename();
+                  }}
+                />
+                <IconButton onClick={handleConfirmRename} size="small" aria-label="Save sheet name">
+                  <CheckIcon fontSize="small" />
+                </IconButton>
+                <IconButton onClick={handleCancelRename} size="small" aria-label="Cancel rename">
+                  <CloseIcon fontSize="small" />
+                </IconButton>
+              </>
+            ) : (
+              <>
+                <Typography variant="h6" component="span" sx={{ fontWeight: 700 }}>
+                  {sheetName}
+                </Typography>
+                <IconButton onClick={handleStartRename} size="small" aria-label="Edit sheet name">
+                  <EditOutlinedIcon fontSize="small" />
+                </IconButton>
+              </>
+            )}
+          </Box>
         </div>
         <div className="header-actions">
+          <Button
+            onClick={handleOpenDrawer}
+            variant="outlined"
+            startIcon={<FolderOpenOutlinedIcon />}
+            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+          >
+            Sheets
+          </Button>
           <Button
             onClick={() => navigate('/')}
             variant="outlined"
@@ -759,6 +856,23 @@ function ExpenseSheet() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <SheetDrawer
+        open={drawerOpen}
+        onClose={handleCloseDrawer}
+        currentSheetName={sheetName}
+      />
+
+      <Snackbar
+        open={Boolean(error)}
+        autoHideDuration={4000}
+        onClose={handleCloseError}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="error" onClose={handleCloseError} sx={{ borderRadius: 0 }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </div>
   );
 }
