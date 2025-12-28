@@ -2,29 +2,31 @@
   min-height: 100vh;
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: var(--spacing-xl);
+  align-items: flex-start;
+  padding: var(--spacing-2xl) var(--spacing-xl);
   background-color: var(--color-gray-100);
 }
 
 .setup-container {
   width: 100%;
-  max-width: 600px;
+  max-width: 720px;
   background-color: var(--color-secondary);
   border: var(--border-width) solid var(--color-border);
   padding: var(--spacing-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
 }
 
 .header {
-  margin-bottom: var(--spacing-2xl);
-  text-align: center;
+  text-align: left;
 }
 
 .title-row {
   display: inline-flex;
   align-items: baseline;
   gap: var(--spacing-sm);
-  justify-content: center;
+  justify-content: flex-start;
   margin-bottom: var(--spacing-sm);
 }
 
@@ -32,29 +34,32 @@
   font-size: 3rem;
   margin-bottom: var(--spacing-sm);
   letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .subtitle {
   color: var(--color-gray-500);
   font-size: 1rem;
   letter-spacing: 0.02em;
+  margin-bottom: var(--spacing-md);
 }
 
 .party-form {
-  margin-bottom: var(--spacing-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
 }
 
 .party-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-sm);
 }
 
 .party-input-row {
   display: flex;
   gap: var(--spacing-sm);
-  align-items: center;
+  align-items: stretch;
 }
 
 .party-input {
@@ -111,6 +116,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  border-top: var(--border-width) solid var(--color-border);
+  padding-top: var(--spacing-lg);
 }
 
 .btn-primary {
@@ -146,4 +153,31 @@
 .btn-secondary:hover {
   background-color: var(--color-primary);
   color: var(--color-secondary);
+}
+
+@media (max-width: 768px) {
+  .party-setup {
+    padding: var(--spacing-xl);
+  }
+
+  .header h1 {
+    font-size: 2.4rem;
+  }
+
+  .setup-container {
+    padding: var(--spacing-xl);
+    gap: var(--spacing-lg);
+  }
+
+  .title-row {
+    gap: var(--spacing-xs);
+  }
+
+  .party-input-row {
+    flex-direction: column;
+  }
+
+  .actions {
+    padding-top: var(--spacing-md);
+  }
 }
