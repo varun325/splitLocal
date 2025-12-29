@@ -33,8 +33,11 @@ import SelectAllIcon from '@mui/icons-material/SelectAll';
 import RemoveDoneIcon from '@mui/icons-material/RemoveDone';
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import './ExpenseSheet.css';
 import { loadSheet, saveSheet, sheetExists, renameSheet } from '../storage/splitMoneyStore';
 import SheetDrawer from '../components/SheetDrawer';
@@ -60,6 +63,13 @@ import {
 } from '@mui/material/colors';
 
 const DEFAULT_EXPENSE_TYPES = ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'];
+
+const formatINRNumber = (amount) => {
+  const value = Number(amount) || 0;
+  return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+};
+
+const formatINRForPdf = (amount) => `INR ${formatINRNumber(amount)}`;
 
 const SWATCHES = [
   red[700],
@@ -410,6 +420,296 @@ function ExpenseSheet() {
     XLSX.writeFile(wb, 'expenses.xlsx');
   };
 
+  const drawPieToCanvas = ({ slices, colors, size = 520 }) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = Math.floor(size * 0.36);
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+
+    const total = slices.reduce((sum, s) => sum + (Number(s.value) || 0), 0);
+    if (total <= 0) {
+      ctx.strokeStyle = '#999999';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      return canvas;
+    }
+
+    let startAngle = -Math.PI / 2;
+    slices.forEach((s, idx) => {
+      const value = Number(s.value) || 0;
+      if (value <= 0) return;
+      const angle = (value / total) * Math.PI * 2;
+      const endAngle = startAngle + angle;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = colors[idx % colors.length];
+      ctx.fill();
+
+      startAngle = endAngle;
+    });
+
+    // subtle center cut for modern donut look
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.floor(radius * 0.55), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    // center label
+    ctx.fillStyle = '#111111';
+    ctx.font = '700 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Total', cx, cy - 16);
+    ctx.font = '700 26px Arial';
+    ctx.fillText(formatINRForPdf(total), cx, cy + 18);
+
+    return canvas;
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+    const contentWidth = pageWidth - margin * 2;
+
+    const nowStr = new Date().toLocaleString();
+    const grandTotal = totalExpenses;
+
+    const ensureSpace = (neededHeight, cursorY) => {
+      if (cursorY + neededHeight > pageHeight - margin) {
+        doc.addPage();
+        return margin;
+      }
+      return cursorY;
+    };
+
+    // Header
+    doc.setFillColor(220, 0, 0);
+    doc.rect(0, 0, pageWidth, 92, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('Split Money — Expense Report', margin, 38);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`Sheet: ${sheetName || '-'}`, margin, 58);
+    doc.text(`Generated: ${nowStr}`, margin, 76);
+
+    // Summary card
+    let cursorY = 116;
+    doc.setTextColor(17, 17, 17);
+    doc.setDrawColor(230, 230, 230);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(margin, cursorY, contentWidth, 66, 6, 6, 'FD');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Grand Total', margin + 16, cursorY + 24);
+    doc.setFontSize(20);
+    doc.text(formatINRForPdf(grandTotal), margin + 16, cursorY + 52);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.text(`${parties.length} parties • ${expenses.length} expenses`, margin + contentWidth - 16, cursorY + 38, { align: 'right' });
+
+    cursorY += 86;
+
+    // Build party totals list
+    const partyRows = parties.map((party) => {
+      const t = partyTotals[party] || { direct: 0, split: 0, total: 0 };
+      return {
+        party,
+        direct: t.direct,
+        split: t.split,
+        total: t.total,
+      };
+    }).sort((a, b) => b.total - a.total);
+
+    // Party totals table
+    autoTable(doc, {
+      startY: cursorY,
+      margin: { left: margin, right: margin },
+      head: [['Party', 'Direct', 'Split', 'Total']],
+      body: partyRows.map((r) => [r.party, formatINRForPdf(r.direct), formatINRForPdf(r.split), formatINRForPdf(r.total)]),
+      styles: { font: 'helvetica', fontSize: 10, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1 },
+      headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 240 },
+        1: { cellWidth: 110, halign: 'right' },
+        2: { cellWidth: 110, halign: 'right' },
+        3: { cellWidth: 110, halign: 'right' },
+      },
+    });
+
+    cursorY = (doc.lastAutoTable?.finalY || cursorY) + 18;
+
+    // Charts page (stacked blocks for readability)
+    doc.addPage();
+    cursorY = margin;
+
+    doc.setTextColor(17, 17, 17);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Charts', margin, cursorY);
+    cursorY += 12;
+
+    const makeSlices = (rawItems, colorPicker) => {
+      const items = rawItems
+        .slice()
+        .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
+        .map((it, idx) => ({
+          label: String(it.label),
+          value: Number(it.value) || 0,
+          color: colorPicker(it, idx),
+        }))
+        .filter((it) => it.value > 0);
+
+      const max = 10;
+      if (items.length <= max) return items;
+      const top = items.slice(0, max);
+      const rest = items.slice(max);
+      const others = rest.reduce((sum, it) => sum + it.value, 0);
+      top.push({ label: 'Others', value: others, color: '#888888' });
+      return top;
+    };
+
+    const buildLegendRows = (items) => {
+      const total = items.reduce((sum, it) => sum + (Number(it.value) || 0), 0) || 1;
+      return items.map((it) => {
+        const pct = Math.round((it.value / total) * 1000) / 10;
+        return [it.color, it.label, formatINRForPdf(it.value), `${pct}%`];
+      });
+    };
+
+    const drawChartBlock = (title, slices) => {
+      cursorY = ensureSpace(320, cursorY);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(17, 17, 17);
+      doc.text(title, margin, cursorY + 18);
+
+      const chartSize = 420;
+      const pieCanvas = drawPieToCanvas({
+        slices,
+        colors: slices.map((s) => s.color),
+        size: chartSize,
+      });
+
+      const imgW = 190;
+      const imgH = 190;
+      const imgX = margin + (contentWidth - imgW) / 2;
+      const imgY = cursorY + 28;
+
+      if (pieCanvas) {
+        const img = pieCanvas.toDataURL('image/png');
+        doc.addImage(img, 'PNG', imgX, imgY, imgW, imgH);
+      }
+
+      const legendStartY = imgY + imgH + 12;
+      const legendRows = buildLegendRows(slices);
+      autoTable(doc, {
+        startY: legendStartY,
+        margin: { left: margin, right: margin },
+        head: [['', 'Category', 'Amount', 'Share']],
+        body: legendRows,
+        styles: { font: 'helvetica', fontSize: 9, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1 },
+        headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 18 },
+          1: { cellWidth: 250 },
+          2: { cellWidth: 150, halign: 'right' },
+          3: { cellWidth: 70, halign: 'right' },
+        },
+        didDrawCell: (data) => {
+          if (data.section !== 'body') return;
+          if (data.column.index !== 0) return;
+          const color = data.cell.raw;
+          if (typeof color !== 'string') return;
+          const hex = color.startsWith('#') ? color : null;
+          if (hex && hex.length === 7) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            doc.setFillColor(r, g, b);
+          } else {
+            doc.setFillColor(200, 0, 0);
+          }
+          const pad = 5;
+          doc.rect(data.cell.x + pad, data.cell.y + pad, data.cell.width - pad * 2, data.cell.height - pad * 2, 'F');
+        },
+      });
+
+      cursorY = (doc.lastAutoTable?.finalY || legendStartY) + 18;
+    };
+
+    const typeSlices = makeSlices(
+      typeBreakdown.map((t) => ({ label: t.name, value: t.value })),
+      (it) => typeColorMap[it.label] || SWATCHES[0],
+    );
+    const partySlices = makeSlices(
+      partyRows.map((r, idx) => ({ label: r.party, value: r.total, idx })),
+      (it) => SWATCHES[(it.idx ?? 0) % SWATCHES.length],
+    );
+
+    drawChartBlock('By Type', typeSlices);
+    drawChartBlock('By Party', partySlices);
+
+    // Expenses table (new page for readability)
+    doc.addPage();
+    doc.setTextColor(17, 17, 17);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Expenses', margin, margin);
+
+    const expenseRows = expenses.map((exp, idx) => {
+      const splitPartiesStr = exp.paidBy === 'Split Between'
+        ? (Array.isArray(exp.splitParties) ? exp.splitParties.join(', ') : '')
+        : '';
+      return [
+        String(idx + 1),
+        exp.name || '-',
+        exp.type || '-',
+        formatINRForPdf(parseFloat(exp.cost) || 0),
+        exp.paidBy || '-',
+        splitPartiesStr,
+      ];
+    });
+
+    autoTable(doc, {
+      startY: margin + 12,
+      margin: { left: margin, right: margin },
+      head: [['#', 'Expense', 'Type', 'Cost', 'Paid By', 'Split Parties']],
+      body: expenseRows,
+      styles: { font: 'helvetica', fontSize: 9, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1, overflow: 'linebreak' },
+      headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 22, halign: 'right' },
+        1: { cellWidth: 170 },
+        2: { cellWidth: 90 },
+        3: { cellWidth: 70, halign: 'right' },
+        4: { cellWidth: 90 },
+        5: { cellWidth: 120 },
+      },
+    });
+
+    const fileSafe = (sheetName || 'sheet').replace(/[^a-z0-9\-_ ]/gi, '').trim() || 'sheet';
+    doc.save(`${fileSafe}-report.pdf`);
+  };
+
   const exportToJSON = () => {
     const data = {
       name: sheetName,
@@ -494,6 +794,14 @@ function ExpenseSheet() {
             sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
           >
             Back
+          </Button>
+          <Button
+            onClick={exportToPDF}
+            variant="outlined"
+            startIcon={<PictureAsPdfOutlinedIcon />}
+            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
+          >
+            Export PDF
           </Button>
           <Button
             onClick={exportToExcel}
