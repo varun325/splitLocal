@@ -10,13 +10,26 @@ export const generateExcel = (sheetName, expenses, parties, partyTotals, typeBre
   const wb = XLSX.utils.book_new();
 
   // Expenses sheet
-  const expensesData = expenses.map((exp) => ({
-    Description: exp.description || '',
-    Cost: Number(exp.cost) || 0,
-    Type: exp.type || '',
-    'Paid By': exp.paidBy || '',
-    'Split Parties': Array.isArray(exp.splitParties) ? exp.splitParties.join(', ') : '',
-  }));
+  const expensesData = expenses.map((exp) => {
+    const paidBy = exp.paidBy || '';
+
+    let splitPartiesCell = '';
+    if (paidBy === 'Split Between') {
+      splitPartiesCell = Array.isArray(exp.splitParties) ? exp.splitParties.join(', ') : '';
+    } else if (paidBy === 'Split Equally') {
+      splitPartiesCell = Array.isArray(exp.splitParties) && exp.splitParties.length > 0
+        ? exp.splitParties.join(', ')
+        : parties.join(', ');
+    }
+
+    return {
+      Description: exp.description || exp.name || '',
+      Cost: Number(exp.cost) || 0,
+      Type: exp.type || '',
+      'Paid By': paidBy,
+      'Split Parties': splitPartiesCell,
+    };
+  });
 
   const expensesWS = XLSX.utils.json_to_sheet(expensesData);
   XLSX.utils.book_append_sheet(wb, expensesWS, 'Expenses');
