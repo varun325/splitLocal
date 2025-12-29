@@ -133,6 +133,9 @@ function ExpenseSheet() {
   const [editNamesOpen, setEditNamesOpen] = useState(false);
   const [draftParties, setDraftParties] = useState([]);
   const [draftExpenseTypes, setDraftExpenseTypes] = useState([]);
+  const [draftVersion, setDraftVersion] = useState(0);
+  const partyInputRefs = useRef([]);
+  const typeInputRefs = useRef([]);
 
   const [splitBetweenForExpenseId, setSplitBetweenForExpenseId] = useState(null);
   const [splitBetweenSelection, setSplitBetweenSelection] = useState([]);
@@ -260,19 +263,19 @@ function ExpenseSheet() {
   const openEditNames = useCallback(() => {
     setDraftParties(parties);
     setDraftExpenseTypes(expenseTypes);
+    setDraftVersion((v) => v + 1); // force input remount for fresh defaults
+    partyInputRefs.current = [];
+    typeInputRefs.current = [];
     setEditNamesOpen(true);
-  }, [parties, expenseTypes]);
+  }, [expenseTypes, parties]);
 
   const closeEditNames = useCallback(() => {
     setEditNamesOpen(false);
   }, []);
 
   const saveEditedNames = useCallback(() => {
-    const nextPartiesRaw = Array.isArray(draftParties) ? draftParties : [];
-    const nextTypesRaw = Array.isArray(draftExpenseTypes) ? draftExpenseTypes : [];
-
-    const nextParties = nextPartiesRaw.map((p) => String(p ?? '').trim()).filter(Boolean);
-    const nextTypes = nextTypesRaw.map((t) => String(t ?? '').trim()).filter(Boolean);
+    const nextParties = draftParties.map((_, idx) => partyInputRefs.current[idx]?.value?.trim() || '').filter(Boolean);
+    const nextTypes = draftExpenseTypes.map((_, idx) => typeInputRefs.current[idx]?.value?.trim() || '').filter(Boolean);
 
     if (nextParties.length === 0) {
       setError('At least one party is required');
@@ -921,14 +924,11 @@ function ExpenseSheet() {
           <Box sx={{ display: 'grid', gap: 1 }}>
             {draftParties.map((p, idx) => (
               <TextField
-                key={`${p}-${idx}`}
-                value={p}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setDraftParties((prev) => prev.map((x, i) => (i === idx ? v : x)));
-                }}
+                key={`party-${draftVersion}-${idx}`}
+                defaultValue={p}
                 size="small"
                 fullWidth
+                inputRef={(el) => { partyInputRefs.current[idx] = el; }}
               />
             ))}
           </Box>
@@ -939,14 +939,11 @@ function ExpenseSheet() {
           <Box sx={{ display: 'grid', gap: 1 }}>
             {draftExpenseTypes.map((t, idx) => (
               <TextField
-                key={`${t}-${idx}`}
-                value={t}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setDraftExpenseTypes((prev) => prev.map((x, i) => (i === idx ? v : x)));
-                }}
+                key={`type-${draftVersion}-${idx}`}
+                defaultValue={t}
                 size="small"
                 fullWidth
+                inputRef={(el) => { typeInputRefs.current[idx] = el; }}
               />
             ))}
           </Box>
