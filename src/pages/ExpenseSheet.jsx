@@ -1,27 +1,28 @@
-import { useState, useEffect, useMemo, useDeferredValue, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import {
   Box,
   Button,
-  Checkbox,
   Snackbar,
   Alert,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
-  FormGroup,
   IconButton,
-  MenuItem,
-  Select,
   TextField,
   Typography,
-  FormControl,
-  InputLabel,
   ToggleButton,
   ToggleButtonGroup,
+  CircularProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -32,19 +33,23 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
-import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
-import SelectAllIcon from '@mui/icons-material/SelectAll';
-import RemoveDoneIcon from '@mui/icons-material/RemoveDone';
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import * as XLSX from 'xlsx';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import PeopleAltOutlinedIcon from '@mui/icons-material/PeopleAltOutlined';
+import SelectAllIcon from '@mui/icons-material/SelectAll';
+import RemoveDoneIcon from '@mui/icons-material/RemoveDone';
 import './ExpenseSheet.css';
 import { loadSheet, saveSheet, sheetExists, renameSheet } from '../storage/splitMoneyStore';
 import SheetDrawer from '../components/SheetDrawer';
+import { useExpenseCalculations } from '../hooks/useExpenseCalculations';
+import { useSheetPersistence } from '../hooks/useSheetPersistence';
+import { TotalsView } from '../components/ExpenseSheet/TotalsView';
+
+// Lazy load heavy components
+const ChartsView = lazy(() => import('../components/ExpenseSheet/ChartsView').then(m => ({ default: m.ChartsView })));
+const PDFExporter = lazy(() => import('../components/ExpenseSheet/PDFExporter').then(m => ({ default: m.PDFExporter })));
+const ExcelExporter = lazy(() => import('../components/ExpenseSheet/ExcelExporter').then(m => ({ default: m.ExcelExporter })));
 
 import {
   red,
@@ -211,16 +216,19 @@ function ExpenseSheet() {
   const [splitBetweenForExpenseId, setSplitBetweenForExpenseId] = useState(null);
   const [splitBetweenSelection, setSplitBetweenSelection] = useState([]);
 
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+
   const [summaryTab, setSummaryTab] = useState(0);
-  const [chartView, setChartView] = useState('type');
   const [selectedParty, setSelectedParty] = useState('');
 
   const [expenses, setExpenses] = useState(importedExpenses.length > 0 ? importedExpenses : [
-    { id: '1', name: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }
+    { id: '1', description: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }
   ]);
 
-  const deferredExpenses = useDeferredValue(expenses);
-  const deferredParties = useDeferredValue(parties);
+  // Use custom hooks
+  const { partyTotals, typeBreakdown, totalExpenses } = useExpenseCalculations(expenses, parties);
+  useSheetPersistence(sheetName, parties, expenses, expenseTypes);
 
   // Initialize selectedParty when parties are loaded
   useEffect(() => {
@@ -266,14 +274,6 @@ function ExpenseSheet() {
       cancelled = true;
     };
   }, [sheetName, initialParties.length, importedExpenses.length, navigate, locationState.expenseTypes]);
-
-  useEffect(() => {
-    if (!sheetName) return;
-    const t = setTimeout(() => {
-      saveSheet({ name: sheetName, parties, expenses, expenseTypes }).catch(() => {});
-    }, 400);
-    return () => clearTimeout(t);
-  }, [sheetName, parties, expenses, expenseTypes]);
 
   const handleOpenDrawer = () => setDrawerOpen(true);
   const handleCloseDrawer = () => setDrawerOpen(false);
@@ -401,13 +401,13 @@ function ExpenseSheet() {
   const addExpense = useCallback(() => {
     setExpenses((prev) => [...prev, {
       id: Date.now().toString(),
-      name: '',
+      description: '',
       cost: '',
       paidBy: '',
       type: expenseTypes[0] || 'Other',
-      splitParties: parties
+      splitParties: []
     }]);
-  }, [expenseTypes, parties]);
+  }, [expenseTypes]);
 
   const updateExpense = useCallback((id, field, value, extras = {}) => {
     setExpenses((prev) => prev.map((exp) =>
@@ -419,103 +419,16 @@ function ExpenseSheet() {
     setExpenses((prev) => prev.length > 1 ? prev.filter(exp => exp.id !== id) : prev);
   }, []);
 
-  const handleDragEnd = (result) => {
+  const handleDragEnd = useCallback((result) => {
     if (!result.destination) return;
 
-    const items = Array.from(expenses);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    setExpenses(items);
-  };
-
-  const calculatePartyTotals = (currentExpenses, currentParties) => {
-    const totals = {};
-    currentParties.forEach((party) => {
-      totals[party] = { direct: 0, split: 0, total: 0 };
+    setExpenses((prev) => {
+      const items = Array.from(prev);
+      const [reorderedItem] = items.splice(result.source.index, 1);
+      items.splice(result.destination.index, 0, reorderedItem);
+      return items;
     });
-
-    currentExpenses.forEach((expense) => {
-      const cost = parseAmount(expense.cost);
-      const paidBy = expense.paidBy;
-      if (!paidBy || cost <= 0) return;
-
-      if (paidBy === 'Split Equally') {
-        const perPerson = cost / currentParties.length;
-        currentParties.forEach((party) => {
-          totals[party].split += perPerson;
-        });
-        return;
-      }
-
-      if (paidBy === 'Split Between') {
-        const selected = Array.isArray(expense.splitParties) && expense.splitParties.length > 0
-          ? expense.splitParties
-          : currentParties;
-        const perPerson = cost / selected.length;
-        selected.forEach((party) => {
-          if (totals[party] !== undefined) {
-            totals[party].split += perPerson;
-          }
-        });
-        return;
-      }
-
-      if (totals[paidBy] !== undefined) {
-        totals[paidBy].direct += cost;
-      }
-    });
-
-    currentParties.forEach((party) => {
-      totals[party].total = totals[party].direct + totals[party].split;
-    });
-
-    return totals;
-  };
-
-  const calculateTypeBreakdown = (currentExpenses) => {
-    const breakdown = {};
-    currentExpenses.forEach(expense => {
-      const cost = parseAmount(expense.cost);
-      if (cost > 0 && expense.type) {
-        breakdown[expense.type] = (breakdown[expense.type] || 0) + cost;
-      }
-    });
-    return Object.entries(breakdown).map(([name, value]) => ({ name, value }));
-  };
-
-  const calculatePartyTypeBreakdown = (currentExpenses, currentParties, party) => {
-    const breakdown = {};
-    currentExpenses.forEach((expense) => {
-      const cost = parseAmount(expense.cost);
-      if (cost <= 0 || !expense.type) return;
-      const paidBy = expense.paidBy;
-      if (!paidBy) return;
-
-      if (paidBy === 'Split Equally') {
-        const per = cost / Math.max(currentParties.length, 1);
-        breakdown[expense.type] = (breakdown[expense.type] || 0) + per;
-      } else if (paidBy === 'Split Between') {
-        const selected = Array.isArray(expense.splitParties) && expense.splitParties.length > 0 ? expense.splitParties : currentParties;
-        if (selected.includes(party)) {
-          const per = cost / Math.max(selected.length, 1);
-          breakdown[expense.type] = (breakdown[expense.type] || 0) + per;
-        }
-      } else if (paidBy === party) {
-        breakdown[expense.type] = (breakdown[expense.type] || 0) + cost;
-      }
-    });
-    return Object.entries(breakdown).map(([name, value]) => ({ name, value }));
-  };
-
-  const calculatePartyPercentages = (currentParties, totals) => {
-    const grandTotal = Object.values(totals).reduce((sum, t) => sum + t.total, 0) || 1;
-    return currentParties.map(party => ({
-      name: party,
-      value: totals[party].total,
-      percentage: ((totals[party].total / grandTotal) * 100).toFixed(1)
-    }));
-  };
+  }, []);
 
   const startCreateType = (expenseId) => {
     setNewTypeForExpenseId(expenseId);
@@ -596,23 +509,6 @@ function ExpenseSheet() {
     updateExpense(splitBetweenForExpenseId, 'paidBy', 'Split Between');
     updateExpense(splitBetweenForExpenseId, 'splitParties', splitBetweenSelection);
     closeSplitBetween();
-  };
-
-  const exportToExcel = () => {
-    const exportData = expenses.map(exp => ({
-      'Expense Name': exp.name,
-      'Cost': exp.cost,
-      'Paid By': exp.paidBy,
-      'Type': exp.type,
-      'Split Parties': exp.paidBy === 'Split Between'
-        ? (Array.isArray(exp.splitParties) ? exp.splitParties.join(', ') : '')
-        : ''
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
-    XLSX.writeFile(wb, 'expenses.xlsx');
   };
 
   const drawPieToCanvas = ({ slices, colors, size = 520 }) => {
@@ -1099,21 +995,9 @@ function ExpenseSheet() {
     URL.revokeObjectURL(url);
   };
 
-  const partyTotals = useMemo(
-    () => calculatePartyTotals(deferredExpenses, deferredParties),
-    [deferredExpenses, deferredParties]
-  );
-  const typeBreakdown = useMemo(
-    () => calculateTypeBreakdown(deferredExpenses),
-    [deferredExpenses]
-  );
   const typeColorMap = useMemo(
     () => buildTypeColorMap(typeBreakdown.map((t) => t.name)),
     [typeBreakdown]
-  );
-  const totalExpenses = useMemo(
-    () => deferredExpenses.reduce((sum, exp) => sum + parseAmount(exp.cost), 0),
-    [deferredExpenses]
   );
 
   if (!parties || parties.length === 0) {
@@ -1178,18 +1062,20 @@ function ExpenseSheet() {
             Back
           </Button>
           <Button
-            onClick={exportToPDF}
+            onClick={() => setIsExportingPDF(true)}
             variant="outlined"
             startIcon={<PictureAsPdfIcon />}
+            disabled={isExportingPDF}
           >
-            Export PDF
+            {isExportingPDF ? 'Generating...' : 'Export PDF'}
           </Button>
           <Button
-            onClick={exportToExcel}
+            onClick={() => setIsExportingExcel(true)}
             variant="outlined"
             startIcon={<FileDownloadOutlinedIcon />}
+            disabled={isExportingExcel}
           >
-            Export Excel
+            {isExportingExcel ? 'Generating...' : 'Export Excel'}
           </Button>
           <Button
             onClick={exportToJSON}
@@ -1427,229 +1313,23 @@ function ExpenseSheet() {
               </div>
             </Box>
             {summaryTab === 0 && (
-              <Box>
-                {(() => {
-                  if (chartView === 'party-breakdown' && selectedParty) {
-                    const partyData = calculatePartyTypeBreakdown(deferredExpenses, deferredParties, selectedParty);
-                    const partyTotal = partyData.reduce((sum, item) => sum + item.value, 0);
-                    return (
-                      <div className="chart-total-display">
-                        <div className="chart-total-label">{selectedParty} Total</div>
-                        <div className="chart-total-amount">{formatINR(partyTotal)}</div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="chart-total-display">
-                      <div className="chart-total-label">Total Expenses</div>
-                      <div className="chart-total-amount">{formatINR(totalExpenses)}</div>
-                    </div>
-                  );
-                })()}
-
-                <Box sx={{ mb: 2 }}>
-                  <FormControl fullWidth size="small">
-                    <InputLabel>View</InputLabel>
-                    <Select
-                      value={chartView}
-                      label="View"
-                      onChange={(e) => {
-                        setChartView(e.target.value);
-                        if (e.target.value === 'party-breakdown' && parties.length > 0) {
-                          setSelectedParty(parties[0]);
-                        }
-                      }}
-                    >
-                      <MenuItem value="type">By Type (Total)</MenuItem>
-                      <MenuItem value="party-percentage">By Party (%)</MenuItem>
-                      <MenuItem value="party-breakdown">By Party Type Breakdown</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                {chartView === 'party-breakdown' && (
-                  <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                    <InputLabel>Select Party</InputLabel>
-                    <Select
-                      value={selectedParty}
-                      label="Select Party"
-                      onChange={(e) => setSelectedParty(e.target.value)}
-                    >
-                      {parties.map(party => (
-                        <MenuItem key={party} value={party}>{party}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
-
-                {chartView === 'type' && typeBreakdown.length > 0 && (
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
-                      Expense by Type
-                    </Typography>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={typeBreakdown}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                        >
-                          {typeBreakdown.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={typeColorMap[entry.name] || SWATCHES[index % SWATCHES.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatINR(value)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-
-                    <div className="chart-legend" aria-label="Expense type legend">
-                      {typeBreakdown
-                        .slice()
-                        .sort((a, b) => b.value - a.value)
-                        .map((item) => (
-                          <div key={item.name} className="legend-item">
-                            <span
-                              className="legend-swatch"
-                              style={{ backgroundColor: typeColorMap[item.name] || 'var(--color-primary)' }}
-                            />
-                            <span className="legend-name">{item.name}</span>
-                            <span className="legend-value">{formatINR(item.value)}</span>
-                          </div>
-                        ))}
-                    </div>
-                  </Box>
-                )}
-
-                {chartView === 'party-percentage' && (
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
-                      Party Split Percentage
-                    </Typography>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <PieChart>
-                        <Pie
-                          data={calculatePartyPercentages(deferredParties, partyTotals)}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                        >
-                          {parties.map((party, index) => (
-                            <Cell key={`cell-${index}`} fill={SWATCHES[index % SWATCHES.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip formatter={(value) => formatINR(value)} />
-                      </PieChart>
-                    </ResponsiveContainer>
-
-                    <div className="chart-legend">
-                      {calculatePartyPercentages(deferredParties, partyTotals)
-                        .sort((a, b) => b.value - a.value)
-                        .map((item, index) => (
-                          <div key={item.name} className="legend-item">
-                            <span
-                              className="legend-swatch"
-                              style={{ backgroundColor: SWATCHES[index % SWATCHES.length] }}
-                            />
-                            <span className="legend-name">{item.name}</span>
-                            <span className="legend-value">{item.percentage}% • {formatINR(item.value)}</span>
-                          </div>
-                        ))}
-                    </div>
-                  </Box>
-                )}
-
-                {chartView === 'party-breakdown' && selectedParty && (
-                  <Box>
-                    {(() => {
-                      const partyData = calculatePartyTypeBreakdown(deferredExpenses, deferredParties, selectedParty);
-                      return (
-                        <>
-                          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
-                            {selectedParty} - Expense by Type
-                          </Typography>
-                          <ResponsiveContainer width="100%" height={250}>
-                            <PieChart>
-                              <Pie
-                                data={partyData}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                outerRadius={80}
-                              >
-                                {partyData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={typeColorMap[entry.name] || SWATCHES[index % SWATCHES.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value) => formatINR(value)} />
-                            </PieChart>
-                          </ResponsiveContainer>
-
-                          <div className="chart-legend">
-                            {partyData
-                              .sort((a, b) => b.value - a.value)
-                              .map((item) => (
-                                <div key={item.name} className="legend-item">
-                                  <span
-                                    className="legend-swatch"
-                                    style={{ backgroundColor: typeColorMap[item.name] || 'var(--color-primary)' }}
-                                  />
-                                  <span className="legend-name">{item.name}</span>
-                                  <span className="legend-value">{formatINR(item.value)}</span>
-                                </div>
-                              ))}
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </Box>
-                )}
-              </Box>
+              <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>}>
+                <ChartsView
+                  expenses={expenses}
+                  parties={parties}
+                  typeBreakdown={typeBreakdown}
+                  partyTotals={partyTotals}
+                  totalExpenses={totalExpenses}
+                />
+              </Suspense>
             )}
 
             {summaryTab === 1 && (
-              <Box>
-                <div className="total-expenses-card">
-                  <div className="total-expenses-content">
-                    <div className="total-expenses-label">Total Expenses</div>
-                    <div className="total-expenses-amount">{formatINR(totalExpenses)}</div>
-                  </div>
-                </div>
-
-                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
-                  Party Totals
-                </Typography>
-                <div className="balance-list">
-                  {parties.map(party => {
-                    const totals = partyTotals[party];
-                    return (
-                      <div key={party} className="balance-item">
-                        <div className="party-name">{party}</div>
-                        <div className="balance-details">
-                          <div className="balance-row">
-                            <span>Direct:</span>
-                            <span className="amount">{formatINR(totals.direct)}</span>
-                          </div>
-                          <div className="balance-row">
-                            <span>Split:</span>
-                            <span className="amount">{formatINR(totals.split)}</span>
-                          </div>
-                          <div className="balance-row net">
-                            <span>Total:</span>
-                            <span className="amount">{formatINR(totals.total)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Box>
+              <TotalsView
+                parties={parties}
+                partyTotals={partyTotals}
+                totalExpenses={totalExpenses}
+              />
             )}
           </div>
         </div>
@@ -1806,6 +1486,32 @@ function ExpenseSheet() {
           {error}
         </Alert>
       </Snackbar>
+
+      {/* Lazy-loaded PDF Export */}
+      {isExportingPDF && (
+        <Suspense fallback={null}>
+          <PDFExporter>
+            {({ generatePDF }) => {
+              generatePDF(sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses);
+              setIsExportingPDF(false);
+              return null;
+            }}
+          </PDFExporter>
+        </Suspense>
+      )}
+
+      {/* Lazy-loaded Excel Export */}
+      {isExportingExcel && (
+        <Suspense fallback={null}>
+          <ExcelExporter>
+            {({ generateExcel }) => {
+              generateExcel(sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses);
+              setIsExportingExcel(false);
+              return null;
+            }}
+          </ExcelExporter>
+        </Suspense>
+      )}
     </div>
   );
 }
