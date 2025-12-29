@@ -676,7 +676,7 @@ function ExpenseSheet() {
     return canvas;
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -694,34 +694,81 @@ function ExpenseSheet() {
       return cursorY;
     };
 
-    // Header
-    doc.setFillColor(220, 0, 0);
-    doc.rect(0, 0, pageWidth, 92, 'F');
-    doc.setTextColor(255, 255, 255);
+    // Load illustration for header (Innovation-bro.svg like the app header)
+    let headerIllustration = null;
+    try {
+      const response = await fetch('/images/Innovation-bro.svg');
+      const svgText = await response.text();
+      const img = new Image();
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+        img.src = 'data:image/svg+xml;base64,' + btoa(svgText);
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = 300;
+      canvas.height = 300;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, 300, 300);
+        headerIllustration = canvas.toDataURL('image/png');
+      }
+    } catch (e) {
+      // illustration optional
+    }
+
+    // Soft cream header inspired by app design
+    doc.setFillColor(246, 240, 215); // #F6F0D7
+    doc.rect(0, 0, pageWidth, 110, 'F');
+    
+    // Add illustration to header if loaded (constrained within bounds)
+    if (headerIllustration) {
+      doc.setGState(new doc.GState({ opacity: 0.25 }));
+      doc.addImage(headerIllustration, 'PNG', pageWidth - 150, 10, 120, 120);
+      doc.setGState(new doc.GState({ opacity: 1 }));
+    }
+
+    doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.text('Split Money — Expense Report', margin, 38);
+    doc.setFontSize(22);
+    doc.text('Expense Report', margin, 42);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
-    doc.text(`Sheet: ${sheetName || '-'}`, margin, 58);
-    doc.text(`Generated: ${nowStr}`, margin, 76);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${sheetName || 'Untitled Sheet'}`, margin, 64);
+    doc.setFontSize(9);
+    doc.text(`Generated: ${nowStr}`, margin, 84);
 
-    // Summary card
-    let cursorY = 116;
-    doc.setTextColor(17, 17, 17);
-    doc.setDrawColor(230, 230, 230);
+    // Summary card with white background
+    let cursorY = 134;
+    doc.setTextColor(15, 23, 42);
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(1);
+    
+    // White background
     doc.setFillColor(255, 255, 255);
-    doc.roundedRect(margin, cursorY, contentWidth, 66, 6, 6, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Grand Total', margin + 16, cursorY + 24);
-    doc.setFontSize(20);
-    doc.text(formatINRForPdf(grandTotal), margin + 16, cursorY + 52);
+    doc.roundedRect(margin, cursorY, contentWidth, 80, 8, 8, 'FD');
+    
+    // Green accent bar on left
+    doc.setFillColor(137, 152, 109); // #89986D
+    doc.roundedRect(margin, cursorY, 6, 80, 3, 3, 'F');
+    
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
-    doc.text(`${parties.length} parties • ${expenses.length} expenses`, margin + contentWidth - 16, cursorY + 38, { align: 'right' });
+    doc.setTextColor(100, 116, 139);
+    doc.text('TOTAL EXPENSES', margin + 20, cursorY + 28);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(15, 23, 42);
+    doc.text(formatINRForPdf(grandTotal), margin + 20, cursorY + 56);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${parties.length} parties • ${expenses.length} expenses`, margin + contentWidth - 20, cursorY + 44, { align: 'right' });
 
-    cursorY += 86;
+    cursorY += 100;
 
     // Build party totals list
     const partyRows = parties.map((party) => {
@@ -734,23 +781,45 @@ function ExpenseSheet() {
       };
     }).sort((a, b) => b.total - a.total);
 
-    // Party totals table
+    // Party totals table with natural palette
     const partyCol0 = Math.floor(contentWidth * 0.46);
     const partyNum = Math.floor((contentWidth - partyCol0) / 3);
     const partyLast = contentWidth - partyCol0 - partyNum * 2;
+    
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Party Breakdown', margin, cursorY);
+    cursorY += 8;
+    
     autoTable(doc, {
       startY: cursorY,
       margin: { left: margin, right: margin },
       tableWidth: contentWidth,
       head: [['Party', 'Direct', 'Split', 'Total']],
       body: partyRows.map((r) => [r.party, formatINRForPdf(r.direct), formatINRForPdf(r.split), formatINRForPdf(r.total)]),
-      styles: { font: 'helvetica', fontSize: 10, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1 },
-      headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
+      styles: { 
+        font: 'helvetica', 
+        fontSize: 10, 
+        cellPadding: 8, 
+        lineColor: [226, 232, 240],
+        lineWidth: 1,
+        textColor: [15, 23, 42]
+      },
+      headStyles: { 
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42], 
+        fontStyle: 'bold',
+        fontSize: 10
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
       columnStyles: {
-        0: { cellWidth: partyCol0 },
+        0: { cellWidth: partyCol0, fontStyle: 'bold' },
         1: { cellWidth: partyNum, halign: 'right' },
         2: { cellWidth: partyNum, halign: 'right' },
-        3: { cellWidth: partyLast, halign: 'right' },
+        3: { cellWidth: partyLast, halign: 'right', fontStyle: 'bold' },
       },
     });
 
@@ -760,11 +829,11 @@ function ExpenseSheet() {
     doc.addPage();
     cursorY = margin;
 
-    doc.setTextColor(17, 17, 17);
+    doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
-    doc.text('Charts', margin, cursorY);
-    cursorY += 12;
+    doc.setFontSize(16);
+    doc.text('Visual Analytics', margin, cursorY);
+    cursorY += 16;
 
     const makeSlices = (rawItems, colorPicker) => {
       const items = rawItems
@@ -830,11 +899,20 @@ function ExpenseSheet() {
     };
 
     const drawChartBlock = (title, slices) => {
-      cursorY = ensureSpace(320, cursorY);
+      cursorY = ensureSpace(340, cursorY);
+      
+      // Section header with minimal accent
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, cursorY, contentWidth, 36, 6, 6, 'F');
+      doc.setFillColor(137, 152, 109); // #89986D
+      doc.roundedRect(margin, cursorY, 4, 36, 2, 2, 'F');
+      
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(17, 17, 17);
-      doc.text(title, margin, cursorY + 18);
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42);
+      doc.text(title, margin + 16, cursorY + 23);
+
+      cursorY += 46;
 
       const chartSize = 420;
       const pieCanvas = drawPieToCanvas({
@@ -843,22 +921,22 @@ function ExpenseSheet() {
         size: chartSize,
       });
 
-      const imgW = 190;
-      const imgH = 190;
+      const imgW = 180;
+      const imgH = 180;
       const imgX = margin + (contentWidth - imgW) / 2;
-      const imgY = cursorY + 28;
+      const imgY = cursorY;
 
       if (pieCanvas) {
         const img = pieCanvas.toDataURL('image/png');
         doc.addImage(img, 'PNG', imgX, imgY, imgW, imgH);
       }
 
-      const legendStartY = imgY + imgH + 12;
+      const legendStartY = imgY + imgH + 16;
       const legendRows = buildLegendRows(slices);
 
-      const colorW = 18;
+      const colorW = 20;
       const shareW = 70;
-      const amountW = 150;
+      const amountW = 140;
       const categoryW = contentWidth - colorW - amountW - shareW;
       autoTable(doc, {
         startY: legendStartY,
@@ -866,13 +944,28 @@ function ExpenseSheet() {
         tableWidth: contentWidth,
         head: [['', 'Category', 'Amount', 'Share']],
         body: legendRows,
-        styles: { font: 'helvetica', fontSize: 9, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1 },
-        headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
+        styles: { 
+          font: 'helvetica', 
+          fontSize: 9, 
+          cellPadding: 7, 
+          lineColor: [226, 232, 240],
+          lineWidth: 1,
+          textColor: [15, 23, 42]
+        },
+        headStyles: { 
+          fillColor: [241, 245, 249],
+          textColor: [15, 23, 42], 
+          fontStyle: 'bold',
+          fontSize: 9
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
         columnStyles: {
           0: { cellWidth: colorW },
-          1: { cellWidth: categoryW },
+          1: { cellWidth: categoryW, fontStyle: 'bold' },
           2: { cellWidth: amountW, halign: 'right' },
-          3: { cellWidth: shareW, halign: 'right' },
+          3: { cellWidth: shareW, halign: 'right', textColor: [100, 116, 139] },
         },
         didDrawCell: (data) => {
           if (data.section !== 'body') return;
@@ -886,14 +979,14 @@ function ExpenseSheet() {
             const b = parseInt(hex.slice(5, 7), 16);
             doc.setFillColor(r, g, b);
           } else {
-            doc.setFillColor(200, 0, 0);
+            doc.setFillColor(156, 171, 132);
           }
           const pad = 5;
-          doc.rect(data.cell.x + pad, data.cell.y + pad, data.cell.width - pad * 2, data.cell.height - pad * 2, 'F');
+          doc.roundedRect(data.cell.x + pad, data.cell.y + pad, data.cell.width - pad * 2, data.cell.height - pad * 2, 2, 2, 'F');
         },
       });
 
-      cursorY = (doc.lastAutoTable?.finalY || legendStartY) + 18;
+      cursorY = (doc.lastAutoTable?.finalY || legendStartY) + 24;
     };
 
     const typeSlices = makeSlices(
@@ -920,10 +1013,17 @@ function ExpenseSheet() {
 
     // Expenses table (new page for readability)
     doc.addPage();
-    doc.setTextColor(17, 17, 17);
+    
+    // Section header with minimal accent
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin, margin, contentWidth, 36, 6, 6, 'F');
+    doc.setFillColor(137, 152, 109); // #89986D
+    doc.roundedRect(margin, margin, 4, 36, 2, 2, 'F');
+    
+    doc.setTextColor(15, 23, 42);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Expenses', margin, margin);
+    doc.setFontSize(13);
+    doc.text('Detailed Expenses', margin + 16, margin + 23);
 
     const expenseRows = expenses.map((exp, idx) => {
       const splitPartiesStr = exp.paidBy === 'Split Between'
@@ -939,27 +1039,43 @@ function ExpenseSheet() {
       ];
     });
 
-    const expNumW = 24;
-    const expCostW = 92;
-    const expTypeW = 90;
-    const expPaidW = 92;
-    const expSplitW = 130;
+    const expNumW = 28;
+    const expCostW = 90;
+    const expTypeW = 85;
+    const expPaidW = 90;
+    const expSplitW = 120;
     const expNameW = contentWidth - expNumW - expTypeW - expCostW - expPaidW - expSplitW;
     autoTable(doc, {
-      startY: margin + 12,
+      startY: margin + 46,
       margin: { left: margin, right: margin },
       tableWidth: contentWidth,
       head: [['#', 'Expense', 'Type', 'Cost', 'Paid By', 'Split Parties']],
       body: expenseRows,
-      styles: { font: 'helvetica', fontSize: 9, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1, overflow: 'linebreak' },
-      headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
+      styles: { 
+        font: 'helvetica', 
+        fontSize: 9, 
+        cellPadding: 7, 
+        lineColor: [226, 232, 240],
+        lineWidth: 1, 
+        overflow: 'linebreak',
+        textColor: [15, 23, 42]
+      },
+      headStyles: { 
+        fillColor: [241, 245, 249],
+        textColor: [15, 23, 42], 
+        fontStyle: 'bold',
+        fontSize: 9
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
       columnStyles: {
-        0: { cellWidth: expNumW, halign: 'right' },
-        1: { cellWidth: expNameW },
+        0: { cellWidth: expNumW, halign: 'right', textColor: [100, 116, 139] },
+        1: { cellWidth: expNameW, fontStyle: 'bold' },
         2: { cellWidth: expTypeW },
-        3: { cellWidth: expCostW, halign: 'right' },
+        3: { cellWidth: expCostW, halign: 'right', fontStyle: 'bold' },
         4: { cellWidth: expPaidW },
-        5: { cellWidth: expSplitW },
+        5: { cellWidth: expSplitW, fontSize: 8, textColor: [100, 116, 139] },
       },
     });
 
