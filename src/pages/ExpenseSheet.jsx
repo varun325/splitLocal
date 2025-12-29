@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue, useRef, useCallback, memo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import {
@@ -63,6 +63,57 @@ import {
 } from '@mui/material/colors';
 
 const DEFAULT_EXPENSE_TYPES = ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'];
+
+// Debounced input component to prevent lag while typing
+const DebouncedTextField = memo(function DebouncedTextField({ value, onChange, debounceMs = 400, ...props }) {
+  const [localValue, setLocalValue] = useState(value);
+  const timeoutRef = useRef(null);
+  const latestOnChange = useRef(onChange);
+  latestOnChange.current = onChange;
+
+  // Sync local value when external value changes (e.g., from drag-drop reorder)
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChange = useCallback((e) => {
+    const newValue = e.target.value;
+    setLocalValue(newValue);
+    
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      latestOnChange.current(newValue);
+    }, debounceMs);
+  }, [debounceMs]);
+
+  // Flush on blur to ensure value is saved
+  const handleBlur = useCallback((e) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    latestOnChange.current(localValue);
+    if (props.onBlur) props.onBlur(e);
+  }, [localValue, props.onBlur]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  return (
+    <TextField
+      {...props}
+      value={localValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+    />
+  );
+});
 
 const parseAmount = (value) => {
   if (value === null || value === undefined) return 0;
@@ -156,6 +207,9 @@ function ExpenseSheet() {
     { id: '1', name: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }
   ]);
 
+  const deferredExpenses = useDeferredValue(expenses);
+  const deferredParties = useDeferredValue(parties);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -241,8 +295,8 @@ function ExpenseSheet() {
 
   const handleCloseError = () => setError('');
 
-  const addExpense = () => {
-    setExpenses([...expenses, {
+  const addExpense = useCallback(() => {
+    setExpenses((prev) => [...prev, {
       id: Date.now().toString(),
       name: '',
       cost: '',
@@ -250,19 +304,17 @@ function ExpenseSheet() {
       type: expenseTypes[0] || 'Other',
       splitParties: parties
     }]);
-  };
+  }, [expenseTypes, parties]);
 
-  const updateExpense = (id, field, value, extras = {}) => {
+  const updateExpense = useCallback((id, field, value, extras = {}) => {
     setExpenses((prev) => prev.map((exp) =>
       exp.id === id ? { ...exp, [field]: value, ...extras } : exp
     ));
-  };
+  }, []);
 
-  const removeExpense = (id) => {
-    if (expenses.length > 1) {
-      setExpenses(expenses.filter(exp => exp.id !== id));
-    }
-  };
+  const removeExpense = useCallback((id) => {
+    setExpenses((prev) => prev.length > 1 ? prev.filter(exp => exp.id !== id) : prev);
+  }, []);
 
   const handleDragEnd = (result) => {
     if (!result.destination) return;
@@ -274,20 +326,20 @@ function ExpenseSheet() {
     setExpenses(items);
   };
 
-  const calculatePartyTotals = () => {
+  const calculatePartyTotals = (currentExpenses, currentParties) => {
     const totals = {};
-    parties.forEach((party) => {
+    currentParties.forEach((party) => {
       totals[party] = { direct: 0, split: 0, total: 0 };
     });
 
-    expenses.forEach((expense) => {
+    currentExpenses.forEach((expense) => {
       const cost = parseAmount(expense.cost);
       const paidBy = expense.paidBy;
       if (!paidBy || cost <= 0) return;
 
       if (paidBy === 'Split Equally') {
-        const perPerson = cost / parties.length;
-        parties.forEach((party) => {
+        const perPerson = cost / currentParties.length;
+        currentParties.forEach((party) => {
           totals[party].split += perPerson;
         });
         return;
@@ -296,7 +348,7 @@ function ExpenseSheet() {
       if (paidBy === 'Split Between') {
         const selected = Array.isArray(expense.splitParties) && expense.splitParties.length > 0
           ? expense.splitParties
-          : parties;
+          : currentParties;
         const perPerson = cost / selected.length;
         selected.forEach((party) => {
           if (totals[party] !== undefined) {
@@ -311,16 +363,16 @@ function ExpenseSheet() {
       }
     });
 
-    parties.forEach((party) => {
+    currentParties.forEach((party) => {
       totals[party].total = totals[party].direct + totals[party].split;
     });
 
     return totals;
   };
 
-  const calculateTypeBreakdown = () => {
+  const calculateTypeBreakdown = (currentExpenses) => {
     const breakdown = {};
-    expenses.forEach(expense => {
+    currentExpenses.forEach(expense => {
       const cost = parseAmount(expense.cost);
       if (cost > 0 && expense.type) {
         breakdown[expense.type] = (breakdown[expense.type] || 0) + cost;
@@ -795,10 +847,22 @@ function ExpenseSheet() {
     URL.revokeObjectURL(url);
   };
 
-  const partyTotals = calculatePartyTotals();
-  const typeBreakdown = calculateTypeBreakdown();
-  const typeColorMap = buildTypeColorMap(typeBreakdown.map((t) => t.name));
-  const totalExpenses = expenses.reduce((sum, exp) => sum + parseAmount(exp.cost), 0);
+  const partyTotals = useMemo(
+    () => calculatePartyTotals(deferredExpenses, deferredParties),
+    [deferredExpenses, deferredParties]
+  );
+  const typeBreakdown = useMemo(
+    () => calculateTypeBreakdown(deferredExpenses),
+    [deferredExpenses]
+  );
+  const typeColorMap = useMemo(
+    () => buildTypeColorMap(typeBreakdown.map((t) => t.name)),
+    [typeBreakdown]
+  );
+  const totalExpenses = useMemo(
+    () => deferredExpenses.reduce((sum, exp) => sum + parseAmount(exp.cost), 0),
+    [deferredExpenses]
+  );
 
   if (!parties || parties.length === 0) {
     return null;
@@ -924,9 +988,9 @@ function ExpenseSheet() {
                             <DragIndicatorIcon fontSize="small" />
                           </div>
                           <div className="col-name">
-                            <TextField
+                            <DebouncedTextField
                               value={expense.name}
-                              onChange={(e) => updateExpense(expense.id, 'name', e.target.value)}
+                              onChange={(val) => updateExpense(expense.id, 'name', val)}
                               placeholder="Enter expense name"
                               variant="outlined"
                               size="small"
@@ -935,10 +999,10 @@ function ExpenseSheet() {
                             />
                           </div>
                           <div className="col-cost">
-                            <TextField
+                            <DebouncedTextField
                               type="number"
                               value={expense.cost}
-                              onChange={(e) => updateExpense(expense.id, 'cost', e.target.value)}
+                              onChange={(val) => updateExpense(expense.id, 'cost', val)}
                               placeholder="0.00"
                               variant="outlined"
                               size="small"
