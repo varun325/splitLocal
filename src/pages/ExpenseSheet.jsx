@@ -18,6 +18,10 @@ import {
   Select,
   TextField,
   Typography,
+  Tabs,
+  Tab,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -33,7 +37,7 @@ import SelectAllIcon from '@mui/icons-material/SelectAll';
 import RemoveDoneIcon from '@mui/icons-material/RemoveDone';
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -203,12 +207,23 @@ function ExpenseSheet() {
   const [splitBetweenForExpenseId, setSplitBetweenForExpenseId] = useState(null);
   const [splitBetweenSelection, setSplitBetweenSelection] = useState([]);
 
+  const [summaryTab, setSummaryTab] = useState(0);
+  const [chartView, setChartView] = useState('type');
+  const [selectedParty, setSelectedParty] = useState('');
+
   const [expenses, setExpenses] = useState(importedExpenses.length > 0 ? importedExpenses : [
     { id: '1', name: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }
   ]);
 
   const deferredExpenses = useDeferredValue(expenses);
   const deferredParties = useDeferredValue(parties);
+
+  // Initialize selectedParty when parties are loaded
+  useEffect(() => {
+    if (parties.length > 0 && !selectedParty) {
+      setSelectedParty(parties[0]);
+    }
+  }, [parties, selectedParty]);
 
   useEffect(() => {
     let cancelled = false;
@@ -379,6 +394,39 @@ function ExpenseSheet() {
       }
     });
     return Object.entries(breakdown).map(([name, value]) => ({ name, value }));
+  };
+
+  const calculatePartyTypeBreakdown = (currentExpenses, currentParties, party) => {
+    const breakdown = {};
+    currentExpenses.forEach((expense) => {
+      const cost = parseAmount(expense.cost);
+      if (cost <= 0 || !expense.type) return;
+      const paidBy = expense.paidBy;
+      if (!paidBy) return;
+
+      if (paidBy === 'Split Equally') {
+        const per = cost / Math.max(currentParties.length, 1);
+        breakdown[expense.type] = (breakdown[expense.type] || 0) + per;
+      } else if (paidBy === 'Split Between') {
+        const selected = Array.isArray(expense.splitParties) && expense.splitParties.length > 0 ? expense.splitParties : currentParties;
+        if (selected.includes(party)) {
+          const per = cost / Math.max(selected.length, 1);
+          breakdown[expense.type] = (breakdown[expense.type] || 0) + per;
+        }
+      } else if (paidBy === party) {
+        breakdown[expense.type] = (breakdown[expense.type] || 0) + cost;
+      }
+    });
+    return Object.entries(breakdown).map(([name, value]) => ({ name, value }));
+  };
+
+  const calculatePartyPercentages = (currentParties, totals) => {
+    const grandTotal = Object.values(totals).reduce((sum, t) => sum + t.total, 0) || 1;
+    return currentParties.map(party => ({
+      name: party,
+      value: totals[party].total,
+      percentage: ((totals[party].total / grandTotal) * 100).toFixed(1)
+    }));
   };
 
   const startCreateType = (expenseId) => {
@@ -928,7 +976,7 @@ function ExpenseSheet() {
           <Button
             onClick={exportToPDF}
             variant="outlined"
-            startIcon={<PictureAsPdfOutlinedIcon />}
+            startIcon={<PictureAsPdfIcon />}
           >
             Export PDF
           </Button>
@@ -961,14 +1009,15 @@ function ExpenseSheet() {
             <div className="col-actions"></div>
           </div>
 
-          <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="expenses">
-              {(provided) => (
-                <div
-                  {...provided.droppableProps}
-                  ref={provided.innerRef}
-                  className="expense-list"
-                >
+          <div className="expense-list-container">
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="expenses">
+                {(provided) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className="expense-list"
+                  >
                   {expenses.map((expense, index) => (
                     <Draggable key={expense.id} draggableId={expense.id} index={index}>
                       {(provided) => (
@@ -1132,6 +1181,7 @@ function ExpenseSheet() {
               )}
             </Droppable>
           </DragDropContext>
+          </div>
 
           <Button
             onClick={addExpense}
@@ -1150,75 +1200,253 @@ function ExpenseSheet() {
 
         <div className="summary-section">
           <div className="summary-card">
-            <h3>Total Expenses</h3>
-            <div className="total-amount">{formatINR(totalExpenses)}</div>
-          </div>
+            <Tabs 
+              value={summaryTab} 
+              onChange={(e, val) => setSummaryTab(val)}
+              sx={{ 
+                borderBottom: 1, 
+                borderColor: 'divider', 
+                mb: 2,
+                '& .MuiTab-root': {
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.95rem',
+                  minHeight: 48,
+                  '&.Mui-selected': {
+                    color: 'primary.main',
+                  }
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px 3px 0 0',
+                }
+              }}
+            >
+              <Tab label="📊 Charts" />
+              <Tab label="💰 Totals" />
+            </Tabs>
 
-          {typeBreakdown.length > 0 && (
-            <div className="summary-card">
-              <h3>Expense by Type</h3>
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={typeBreakdown}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                  >
-                    {typeBreakdown.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={typeColorMap[entry.name] || SWATCHES[index % SWATCHES.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => formatINR(value)} />
-                </PieChart>
-              </ResponsiveContainer>
+            {summaryTab === 0 && (
+              <Box>
+                <Box sx={{ mb: 2 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>View</InputLabel>
+                    <Select
+                      value={chartView}
+                      label="View"
+                      onChange={(e) => {
+                        setChartView(e.target.value);
+                        if (e.target.value === 'party-breakdown' && parties.length > 0) {
+                          setSelectedParty(parties[0]);
+                        }
+                      }}
+                    >
+                      <MenuItem value="type">By Type (Total)</MenuItem>
+                      <MenuItem value="party-percentage">By Party (%)</MenuItem>
+                      <MenuItem value="party-breakdown">By Party Type Breakdown</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
 
-              <div className="chart-legend" aria-label="Expense type legend">
-                {typeBreakdown
-                  .slice()
-                  .sort((a, b) => b.value - a.value)
-                  .map((item) => (
-                    <div key={item.name} className="legend-item">
-                      <span
-                        className="legend-swatch"
-                        style={{ backgroundColor: typeColorMap[item.name] || 'var(--color-primary)' }}
-                      />
-                      <span className="legend-name">{item.name}</span>
-                      <span className="legend-value">{formatINR(item.value)}</span>
+                {chartView === 'party-breakdown' && (
+                  <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                    <InputLabel>Select Party</InputLabel>
+                    <Select
+                      value={selectedParty}
+                      label="Select Party"
+                      onChange={(e) => setSelectedParty(e.target.value)}
+                    >
+                      {parties.map(party => (
+                        <MenuItem key={party} value={party}>{party}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+
+                {chartView === 'type' && typeBreakdown.length > 0 && (
+                  <Box>
+                    <div className="chart-total-display">
+                      <div className="chart-total-label">Total Expenses</div>
+                      <div className="chart-total-amount">{formatINR(totalExpenses)}</div>
                     </div>
-                  ))}
-              </div>
-            </div>
-          )}
 
-          <div className="summary-card">
-            <h3>Party Totals</h3>
-            <div className="balance-list">
-              {parties.map(party => {
-                const totals = partyTotals[party];
-                return (
-                  <div key={party} className="balance-item">
-                    <div className="party-name">{party}</div>
-                    <div className="balance-details">
-                      <div className="balance-row">
-                        <span>Direct:</span>
-                        <span className="amount">{formatINR(totals.direct)}</span>
-                      </div>
-                      <div className="balance-row">
-                        <span>Split:</span>
-                        <span className="amount">{formatINR(totals.split)}</span>
-                      </div>
-                      <div className="balance-row net">
-                        <span>Total:</span>
-                        <span className="amount">{formatINR(totals.total)}</span>
-                      </div>
+                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
+                      Expense by Type
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={typeBreakdown}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                        >
+                          {typeBreakdown.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={typeColorMap[entry.name] || SWATCHES[index % SWATCHES.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatINR(value)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    <div className="chart-legend" aria-label="Expense type legend">
+                      {typeBreakdown
+                        .slice()
+                        .sort((a, b) => b.value - a.value)
+                        .map((item) => (
+                          <div key={item.name} className="legend-item">
+                            <span
+                              className="legend-swatch"
+                              style={{ backgroundColor: typeColorMap[item.name] || 'var(--color-primary)' }}
+                            />
+                            <span className="legend-name">{item.name}</span>
+                            <span className="legend-value">{formatINR(item.value)}</span>
+                          </div>
+                        ))}
                     </div>
+                  </Box>
+                )}
+
+                {chartView === 'party-percentage' && (
+                  <Box>
+                    <div className="chart-total-display">
+                      <div className="chart-total-label">Total Expenses</div>
+                      <div className="chart-total-amount">{formatINR(totalExpenses)}</div>
+                    </div>
+
+                    <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
+                      Party Split Percentage
+                    </Typography>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <PieChart>
+                        <Pie
+                          data={calculatePartyPercentages(deferredParties, partyTotals)}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                        >
+                          {parties.map((party, index) => (
+                            <Cell key={`cell-${index}`} fill={SWATCHES[index % SWATCHES.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatINR(value)} />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    <div className="chart-legend">
+                      {calculatePartyPercentages(deferredParties, partyTotals)
+                        .sort((a, b) => b.value - a.value)
+                        .map((item, index) => (
+                          <div key={item.name} className="legend-item">
+                            <span
+                              className="legend-swatch"
+                              style={{ backgroundColor: SWATCHES[index % SWATCHES.length] }}
+                            />
+                            <span className="legend-name">{item.name}</span>
+                            <span className="legend-value">{item.percentage}% • {formatINR(item.value)}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </Box>
+                )}
+
+                {chartView === 'party-breakdown' && selectedParty && (
+                  <Box>
+                    {(() => {
+                      const partyData = calculatePartyTypeBreakdown(deferredExpenses, deferredParties, selectedParty);
+                      const partyTotal = partyData.reduce((sum, item) => sum + item.value, 0);
+                      return (
+                        <>
+                          <div className="chart-total-display">
+                            <div className="chart-total-label">{selectedParty} Total</div>
+                            <div className="chart-total-amount">{formatINR(partyTotal)}</div>
+                          </div>
+
+                          <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
+                            {selectedParty} - Expense by Type
+                          </Typography>
+                          <ResponsiveContainer width="100%" height={250}>
+                            <PieChart>
+                              <Pie
+                                data={partyData}
+                                dataKey="value"
+                                nameKey="name"
+                                cx="50%"
+                                cy="50%"
+                                outerRadius={80}
+                              >
+                                {partyData.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={typeColorMap[entry.name] || SWATCHES[index % SWATCHES.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value) => formatINR(value)} />
+                            </PieChart>
+                          </ResponsiveContainer>
+
+                          <div className="chart-legend">
+                            {partyData
+                              .sort((a, b) => b.value - a.value)
+                              .map((item) => (
+                                <div key={item.name} className="legend-item">
+                                  <span
+                                    className="legend-swatch"
+                                    style={{ backgroundColor: typeColorMap[item.name] || 'var(--color-primary)' }}
+                                  />
+                                  <span className="legend-name">{item.name}</span>
+                                  <span className="legend-value">{formatINR(item.value)}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {summaryTab === 1 && (
+              <Box>
+                <div className="total-expenses-card">
+                  <div className="total-expenses-content">
+                    <div className="total-expenses-label">Total Expenses</div>
+                    <div className="total-expenses-amount">{formatINR(totalExpenses)}</div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
+                  Party Totals
+                </Typography>
+                <div className="balance-list">
+                  {parties.map(party => {
+                    const totals = partyTotals[party];
+                    return (
+                      <div key={party} className="balance-item">
+                        <div className="party-name">{party}</div>
+                        <div className="balance-details">
+                          <div className="balance-row">
+                            <span>Direct:</span>
+                            <span className="amount">{formatINR(totals.direct)}</span>
+                          </div>
+                          <div className="balance-row">
+                            <span>Split:</span>
+                            <span className="amount">{formatINR(totals.split)}</span>
+                          </div>
+                          <div className="balance-row net">
+                            <span>Total:</span>
+                            <span className="amount">{formatINR(totals.total)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Box>
+            )}
           </div>
         </div>
       </div>

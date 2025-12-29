@@ -35,8 +35,8 @@
   padding: var(--spacing-xl);
   background-color: #ffffff;
   background-image: url('/images/Innovation-bro.svg');
-  background-size: 280px;
-  background-position: right -40px center;
+  background-size: 260px;
+  background-position: right -30px center;
   background-repeat: no-repeat;
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-md);
@@ -51,9 +51,10 @@
   right: 0;
   top: 0;
   bottom: 0;
-  width: 300px;
-  background: linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%);
+  width: 350px;
+  background: linear-gradient(to right, rgba(255,255,255,1) 20%, rgba(255,255,255,0.4) 100%);
   pointer-events: none;
+  z-index: 1;
 }
 
 .sheet-header h1 {
@@ -83,6 +84,10 @@
   flex-wrap: wrap;
   position: relative;
   z-index: 2;
+  background: rgba(255, 255, 255, 0.95);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  backdrop-filter: blur(8px);
 }
 
 .btn-export {
@@ -104,6 +109,18 @@
   padding: var(--spacing-lg);
   box-shadow: var(--shadow-md);
   border: none;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 280px);
+}
+
+.expense-list-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-bottom: var(--spacing-md);
+  min-height: 250px;
+  max-height: calc(100vh - 420px);
 }
 
 .table-header {
@@ -118,6 +135,9 @@
   letter-spacing: 0.025em;
   margin-bottom: var(--spacing-sm);
   border-radius: var(--border-radius-md);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .expense-list {
@@ -332,6 +352,77 @@
 .balance-item:last-child {
   border-bottom: none;
   padding-bottom: var(--spacing-md);
+}
+
+.total-expenses-card {
+  position: relative;
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--spacing-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.total-expenses-card::before {
+  content: '';
+  position: absolute;
+  right: -30px;
+  bottom: -20px;
+  width: 180px;
+  height: 180px;
+  background-image: url('/images/Piggy bank-bro.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.total-expenses-content {
+  position: relative;
+  z-index: 1;
+  color: white;
+}
+
+.total-expenses-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.9;
+  margin-bottom: var(--spacing-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.total-expenses-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  color: white;
+}
+
+.chart-total-display {
+  text-align: center;
+  padding: var(--spacing-md);
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: var(--border-radius-md);
+  margin-bottom: var(--spacing-lg);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.chart-total-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-gray-600);
+  margin-bottom: var(--spacing-xs);
+}
+
+.chart-total-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  color: var(--color-primary);
 }
 
 .party-name {
