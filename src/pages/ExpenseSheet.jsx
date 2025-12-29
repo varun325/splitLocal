@@ -226,6 +226,28 @@ function ExpenseSheet() {
     { id: '1', description: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }
   ]);
 
+  // Sync when navigation passes a different sheet via location.state
+  useEffect(() => {
+    const nextName = locationState.sheetName || '';
+    if (!nextName || nextName === sheetName) return;
+
+    const nextParties = Array.isArray(locationState.parties) ? locationState.parties : [];
+    const nextExpenses = Array.isArray(locationState.expenses) && locationState.expenses.length
+      ? locationState.expenses
+      : [{ id: '1', description: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }];
+    const nextTypes = Array.from(new Set([
+      ...DEFAULT_EXPENSE_TYPES,
+      ...((locationState.expenseTypes || []).filter(Boolean)),
+    ]));
+
+    setSheetName(nextName);
+    setSheetNameInput(nextName);
+    setParties(nextParties);
+    setExpenses(nextExpenses);
+    setExpenseTypes(nextTypes);
+    setSelectedParty(nextParties[0] || '');
+  }, [locationState, sheetName]);
+
   // Use custom hooks
   const { partyTotals, typeBreakdown, totalExpenses } = useExpenseCalculations(expenses, parties);
   useSheetPersistence(sheetName, parties, expenses, expenseTypes);
