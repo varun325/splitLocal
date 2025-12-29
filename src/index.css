@@ -1,36 +1,55 @@
-/* Swiss Design System */
+/* Modern Design System */
 :root {
-  /* Swiss Design Color Palette */
-  --color-primary: #d00000;
-  --color-secondary: #ffffff;
-  --color-accent: #d00000;
-  --color-ink: #111111;
-  --color-border: #111111;
-  --color-gray-100: #f5f5f5;
-  --color-gray-200: #e8e8e8;
-  --color-gray-300: #d1d1d1;
-  --color-gray-400: #a0a0a0;
-  --color-gray-500: #6e6e6e;
-  --color-gray-600: #3c3c3c;
+  /* Modern Color Palette */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-secondary: #10b981;
+  --color-accent: #8b5cf6;
+  --color-ink: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-border: #e2e8f0;
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #f1f5f9;
+  --color-gray-200: #e2e8f0;
+  --color-gray-300: #cbd5e1;
+  --color-gray-400: #94a3b8;
+  --color-gray-500: #64748b;
+  --color-gray-600: #475569;
+  --color-gray-700: #334155;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
   
   /* Typography */
-  --font-primary: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   --font-weight-regular: 400;
   --font-weight-medium: 500;
+  --font-weight-semibold: 600;
   --font-weight-bold: 700;
   
   /* Spacing */
-  /* Golden ratio-ish scale (base=1rem) */
-  --spacing-xs: 0.382rem;
-  --spacing-sm: 0.618rem;
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
-  --spacing-lg: 1.618rem;
-  --spacing-xl: 2.618rem;
-  --spacing-2xl: 4.236rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
   
   /* Border */
   --border-width: 1px;
-  --border-radius: 0;
+  --border-radius-sm: 6px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+  --border-radius-full: 9999px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
 * {
@@ -42,7 +61,7 @@
 body {
   font-family: var(--font-primary);
   font-weight: var(--font-weight-regular);
-  background-color: var(--color-gray-100);
+  background-color: var(--color-gray-50);
   color: var(--color-ink);
   line-height: 1.6;
   min-height: 100vh;
@@ -54,40 +73,42 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: var(--font-weight-bold);
   line-height: 1.2;
   margin-bottom: var(--spacing-md);
+  color: var(--color-ink);
 }
 
 h1 {
-  font-size: 2.5rem;
+  font-size: 2.25rem;
   letter-spacing: -0.02em;
 }
 
 h2 {
-  font-size: 2rem;
+  font-size: 1.875rem;
   letter-spacing: -0.01em;
 }
 
 h3 {
   font-size: 1.5rem;
+  font-weight: var(--font-weight-semibold);
 }
 
 button {
   font-family: var(--font-primary);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  border: var(--border-width) solid var(--color-primary);
-  background-color: var(--color-secondary);
+  border: var(--border-width) solid var(--color-border);
+  background-color: #ffffff;
   color: var(--color-ink);
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border-radius: var(--border-radius);
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  transition: all 0.15s ease;
   font-size: 0.875rem;
+  box-shadow: var(--shadow-sm);
 }
 
 button:hover {
-  background-color: var(--color-primary);
-  color: var(--color-secondary);
+  background-color: var(--color-gray-50);
+  border-color: var(--color-gray-300);
+  box-shadow: var(--shadow-md);
 }
 
 button:focus,
@@ -98,6 +119,14 @@ button:focus-visible {
 
 button.primary {
   background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+button.primary:hover {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
   color: var(--color-secondary);
 }
 

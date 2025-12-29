@@ -110,24 +110,32 @@ function PartySetup() {
 
   return (
     <Box className="party-setup">
-      <Container maxWidth="sm">
-        <Paper className="setup-container" elevation={0}>
+      {/* Hero Section with Illustration */}
+      <Box className="hero-section">
+        <Box className="hero-content">
+          <Typography variant="h1" component="h1" sx={{ fontSize: '3rem', fontWeight: 700, color: 'white', mb: 2 }}>
+            Split Money
+          </Typography>
+          <Typography sx={{ fontSize: '1.125rem', color: 'rgba(255,255,255,0.9)', mb: 3 }}>
+            Track expenses and split bills with friends, family, or roommates effortlessly
+          </Typography>
+          <Box className="hero-illustration">
+            <img src="/images/Finance app-cuate.svg" alt="Finance illustration" />
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Form Section */}
+      <Box className="form-section">
+        <Paper className="setup-container" elevation={3}>
           <Box className="header">
             <Box className="title-row">
-              <GroupsOutlinedIcon sx={{ color: 'var(--color-primary)' }} />
-              <Typography variant="h2" component="h1">Split Money</Typography>
+              <GroupsOutlinedIcon sx={{ color: 'var(--color-primary)', fontSize: '2rem' }} />
+              <Typography variant="h2" component="h1" sx={{ fontSize: '1.75rem', fontWeight: 700 }}>
+                Create New Sheet
+              </Typography>
             </Box>
             <Typography className="subtitle">Add parties to start tracking expenses</Typography>
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                onClick={handleOpenDrawer}
-                variant="outlined"
-                startIcon={<FolderOpenOutlinedIcon />}
-                sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
-              >
-                Sheets
-              </Button>
-            </Box>
           </Box>
 
           <Box className="party-form">
@@ -139,89 +147,80 @@ function PartySetup() {
               variant="outlined"
               fullWidth
               required
-              sx={{ mb: 3 }}
-              InputProps={{
-                sx: {
-                  borderRadius: 0,
-                  backgroundColor: 'var(--color-secondary)',
-                },
-              }}
             />
 
-            <Typography variant="subtitle2" sx={{ mb: 1, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-gray-500)' }}>
-              Parties
-            </Typography>
-            <Stack className="party-list" spacing={2}>
-              {parties.map((party, index) => (
-                <Box key={index} className="party-input-row">
-                  <TextField
-                    value={party}
-                    onChange={(e) => updateParty(index, e.target.value)}
-                    placeholder={`Party ${index + 1}`}
-                    variant="outlined"
-                    fullWidth
-                    size="medium"
-                    InputProps={{
-                      sx: {
-                        borderRadius: 0,
-                        backgroundColor: 'var(--color-secondary)',
-                      },
-                    }}
-                  />
-                  {parties.length > 1 && (
-                    <IconButton
-                      onClick={() => removeParty(index)}
-                      aria-label="Remove party"
-                      sx={{
-                        border: 'var(--border-width) solid var(--color-primary)',
-                        borderRadius: 0,
-                        color: 'var(--color-ink)',
-                        width: 48,
-                        height: 48,
-                      }}
-                    >
-                      <DeleteOutlineIcon />
-                    </IconButton>
-                  )}
-                </Box>
-              ))}
-            </Stack>
+            <Box>
+              <Typography className="section-label">
+                Parties
+              </Typography>
+              <Stack className="party-list" spacing={1.5}>
+                {parties.map((party, index) => (
+                  <Box key={index} className="party-input-row">
+                    <TextField
+                      value={party}
+                      onChange={(e) => updateParty(index, e.target.value)}
+                      placeholder={`Party ${index + 1}`}
+                      variant="outlined"
+                      fullWidth
+                      size="medium"
+                    />
+                    {parties.length > 1 && (
+                      <IconButton
+                        onClick={() => removeParty(index)}
+                        aria-label="Remove party"
+                        sx={{
+                          border: '1px solid',
+                          borderColor: 'error.main',
+                          color: 'error.main',
+                          '&:hover': {
+                            bgcolor: 'error.main',
+                            color: 'white',
+                          },
+                        }}
+                      >
+                        <DeleteOutlineIcon />
+                      </IconButton>
+                    )}
+                  </Box>
+                ))}
+              </Stack>
 
-            <Button
-              onClick={addParty}
-              variant="outlined"
-              startIcon={<AddIcon />}
-              fullWidth
-              sx={{
-                mt: 2,
-                borderRadius: 0,
-                borderStyle: 'dashed',
-                borderColor: 'var(--color-gray-400)',
-                color: 'var(--color-gray-500)',
-              }}
-            >
-              Add Party
-            </Button>
+              <Button
+                onClick={addParty}
+                variant="outlined"
+                startIcon={<AddIcon />}
+                fullWidth
+                sx={{
+                  mt: 1.5,
+                  borderStyle: 'dashed',
+                  borderWidth: 2,
+                }}
+              >
+                Add Party
+              </Button>
+            </Box>
           </Box>
 
           <Stack className="actions" spacing={2}>
             <Button
               onClick={handleGo}
               variant="contained"
-              sx={{
-                borderRadius: 0,
-                backgroundColor: 'var(--color-primary)',
-                color: 'var(--color-secondary)',
-                '&:hover': { backgroundColor: 'var(--color-primary)' },
-                py: 1.5,
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}
+              size="large"
+              fullWidth
             >
-              Go
+              Create Sheet
             </Button>
 
-            <Box className="import-section">
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                onClick={handleOpenDrawer}
+                variant="outlined"
+                startIcon={<FolderOpenOutlinedIcon />}
+                fullWidth
+              >
+                Open Sheet
+              </Button>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -234,18 +233,13 @@ function PartySetup() {
                 variant="outlined"
                 startIcon={<UploadFileIcon />}
                 fullWidth
-                sx={{
-                  borderRadius: 0,
-                  borderColor: 'var(--color-primary)',
-                  color: 'var(--color-ink)',
-                }}
               >
-                Import Data
+                Import
               </Button>
             </Box>
           </Stack>
         </Paper>
-      </Container>
+      </Box>
 
       <SheetDrawer
         open={drawerOpen}
@@ -259,7 +253,7 @@ function PartySetup() {
         onClose={handleCloseError}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity="error" onClose={handleCloseError} sx={{ borderRadius: 0 }}>
+        <Alert severity="error" onClose={handleCloseError}>
           {error}
         </Alert>
       </Snackbar>

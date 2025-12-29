@@ -874,11 +874,10 @@ function ExpenseSheet() {
         <div>
           <div className="sheet-title">
             <ReceiptLongOutlinedIcon sx={{ color: 'var(--color-primary)' }} />
-            <Typography variant="h3" component="h1">Expense Tracker</Typography>
+            <Typography variant="h3" component="h1" sx={{ color: 'var(--color-ink)' }}>Expense Tracker</Typography>
           </div>
           <p className="subtitle">{parties.length} parties tracking expenses</p>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-            <FolderOpenOutlinedIcon fontSize="small" sx={{ color: 'var(--color-primary)' }} />
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>            <FolderOpenOutlinedIcon fontSize="small" sx={{ color: 'var(--color-primary)' }} />
             {editingSheetName ? (
               <>
                 <TextField
@@ -916,7 +915,6 @@ function ExpenseSheet() {
             onClick={handleOpenDrawer}
             variant="outlined"
             startIcon={<FolderOpenOutlinedIcon />}
-            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
           >
             Sheets
           </Button>
@@ -924,7 +922,6 @@ function ExpenseSheet() {
             onClick={() => navigate('/')}
             variant="outlined"
             startIcon={<ArrowBackIcon />}
-            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
           >
             Back
           </Button>
@@ -932,7 +929,6 @@ function ExpenseSheet() {
             onClick={exportToPDF}
             variant="outlined"
             startIcon={<PictureAsPdfOutlinedIcon />}
-            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
           >
             Export PDF
           </Button>
@@ -940,7 +936,6 @@ function ExpenseSheet() {
             onClick={exportToExcel}
             variant="outlined"
             startIcon={<FileDownloadOutlinedIcon />}
-            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
           >
             Export Excel
           </Button>
@@ -948,7 +943,6 @@ function ExpenseSheet() {
             onClick={exportToJSON}
             variant="outlined"
             startIcon={<SaveOutlinedIcon />}
-            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
           >
             Save Data
           </Button>
@@ -1146,10 +1140,8 @@ function ExpenseSheet() {
             fullWidth
             sx={{
               mt: 2,
-              borderRadius: 0,
               borderStyle: 'dashed',
-              borderColor: 'var(--color-gray-400)',
-              color: 'var(--color-gray-500)',
+              borderWidth: 2,
             }}
           >
             Add Expense
@@ -1252,7 +1244,6 @@ function ExpenseSheet() {
               size="small"
               variant="outlined"
               startIcon={<SelectAllIcon />}
-              sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
             >
               Check all
             </Button>
@@ -1261,7 +1252,6 @@ function ExpenseSheet() {
               size="small"
               variant="outlined"
               startIcon={<RemoveDoneIcon />}
-              sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
             >
               Uncheck all
             </Button>
@@ -1288,7 +1278,6 @@ function ExpenseSheet() {
             onClick={closeSplitBetween}
             variant="outlined"
             startIcon={<CloseIcon />}
-            sx={{ borderRadius: 0, borderColor: 'var(--color-primary)', color: 'var(--color-ink)' }}
           >
             Cancel
           </Button>
@@ -1297,7 +1286,6 @@ function ExpenseSheet() {
             variant="contained"
             startIcon={<CheckIcon />}
             disabled={splitBetweenSelection.length === 0}
-            sx={{ borderRadius: 0, backgroundColor: 'var(--color-primary)' }}
           >
             Done
           </Button>
@@ -1316,7 +1304,7 @@ function ExpenseSheet() {
         onClose={handleCloseError}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert severity="error" onClose={handleCloseError} sx={{ borderRadius: 0 }}>
+        <Alert severity="error" onClose={handleCloseError}>
           {error}
         </Alert>
       </Snackbar>

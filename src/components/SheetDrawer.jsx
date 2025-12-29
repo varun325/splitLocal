@@ -52,7 +52,6 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
       PaperProps={{
         sx: {
           width: 320,
-          borderRadius: 0,
         },
       }}
     >
@@ -62,10 +61,10 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid var(--color-gray-300)',
+          borderBottom: '2px solid var(--color-gray-100)',
         }}
       >
-        <Typography variant="h6" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
           Sheets
         </Typography>
         <IconButton onClick={onClose} size="small">
@@ -84,17 +83,20 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
             key={name}
             selected={name === currentSheetName}
             onClick={() => openSheet(name)}
-            sx={{ borderRadius: 0 }}
+            sx={{ 
+              borderRadius: 2,
+              mx: 1,
+              my: 0.5,
+            }}
           >
             <ListItemIcon sx={{ minWidth: 40 }}>
-              <DescriptionOutlinedIcon sx={{ color: name === currentSheetName ? 'var(--color-primary)' : undefined }} />
+              <DescriptionOutlinedIcon />
             </ListItemIcon>
             <ListItemText
               primary={name}
               primaryTypographyProps={{
                 sx: {
-                  fontWeight: name === currentSheetName ? 700 : 400,
-                  color: name === currentSheetName ? 'var(--color-primary)' : undefined,
+                  fontWeight: name === currentSheetName ? 600 : 400,
                 },
               }}
             />
@@ -104,7 +106,14 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
 
       <Divider />
       <Box sx={{ p: 2 }}>
-        <ListItemButton onClick={createNew} sx={{ borderRadius: 0, border: '1px dashed var(--color-gray-400)' }}>
+        <ListItemButton 
+          onClick={createNew} 
+          sx={{ 
+            borderRadius: 2, 
+            border: '2px dashed',
+            borderColor: 'divider',
+          }}
+        >
           <ListItemIcon sx={{ minWidth: 40 }}>
             <AddIcon />
           </ListItemIcon>
