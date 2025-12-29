@@ -1,6 +1,6 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Box, Button, Container, IconButton, Paper, Snackbar, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, IconButton, Paper, Snackbar, Stack, TextField, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import GroupsOutlinedIcon from '@mui/icons-material/GroupsOutlined';
@@ -8,6 +8,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile';
 import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
 import { saveSheet, sheetExists } from '../storage/splitMoneyStore';
 import SheetDrawer from '../components/SheetDrawer';
+import { DEFAULT_EXPENSE_TYPES } from '../constants/expenseSheet';
 import './PartySetup.css';
 
 function PartySetup() {
@@ -18,34 +19,37 @@ function PartySetup() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  const handleOpenDrawer = () => setDrawerOpen(true);
-  const handleCloseDrawer = () => setDrawerOpen(false);
-  const handleCloseError = () => setError('');
+  const handleOpenDrawer = useCallback(() => setDrawerOpen(true), []);
+  const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
+  const handleCloseError = useCallback(() => setError(''), []);
 
-  const addParty = () => {
-    setParties([...parties, '']);
-  };
+  const addParty = useCallback(() => {
+    setParties((prev) => [...prev, '']);
+  }, []);
 
-  const updateParty = (index, value) => {
-    const newParties = [...parties];
-    newParties[index] = value;
-    setParties(newParties);
-  };
+  const updateParty = useCallback((index, value) => {
+    setParties((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }, []);
 
-  const removeParty = (index) => {
-    if (parties.length > 1) {
-      setParties(parties.filter((_, i) => i !== index));
-    }
-  };
+  const removeParty = useCallback((index) => {
+    setParties((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
 
-  const handleGo = async () => {
+  const handleGo = useCallback(async () => {
     const trimmedName = sheetName.trim();
     if (!trimmedName) {
       setError('Sheet name is required');
       return;
     }
 
-    const validParties = parties.filter(p => p.trim() !== '');
+    const validParties = parties.filter((p) => p.trim() !== '');
     if (validParties.length < 2) {
       setError('Please add at least 2 parties');
       return;
@@ -61,17 +65,17 @@ function PartySetup() {
       const sheetData = {
         name: trimmedName,
         parties: validParties,
-        expenses: [{ id: '1', name: '', cost: '', paidBy: '', type: 'Food' }],
-        expenseTypes: ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'],
+        expenses: [{ id: '1', name: '', cost: '', paidBy: '', type: DEFAULT_EXPENSE_TYPES[0] }],
+        expenseTypes: [...DEFAULT_EXPENSE_TYPES],
       };
       await saveSheet(sheetData);
       navigate('/expenses', { state: { sheetName: trimmedName, parties: validParties } });
     } catch (err) {
       setError(err.message || 'Failed to create sheet');
     }
-  };
+  }, [navigate, parties, sheetName]);
 
-  const handleImport = (event) => {
+  const handleImport = useCallback((event) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -93,7 +97,7 @@ function PartySetup() {
               name: finalName,
               parties: data.parties,
               expenses: data.expenses || [],
-              expenseTypes: data.expenseTypes || ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'],
+              expenseTypes: data.expenseTypes || [...DEFAULT_EXPENSE_TYPES],
             };
             await saveSheet(sheetData);
             navigate('/expenses', { state: { sheetName: finalName, parties: data.parties, expenses: data.expenses, expenseTypes: data.expenseTypes } });
@@ -106,7 +110,11 @@ function PartySetup() {
       };
       reader.readAsText(file);
     }
-  };
+  }, [navigate]);
+
+  const triggerImport = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
   return (
     <Box className="party-setup">
@@ -229,7 +237,7 @@ function PartySetup() {
                 style={{ display: 'none' }}
               />
               <Button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={triggerImport}
                 variant="outlined"
                 startIcon={<UploadFileIcon />}
                 fullWidth

@@ -45,31 +45,11 @@ import SheetDrawer from '../components/SheetDrawer';
 import { useExpenseCalculations } from '../hooks/useExpenseCalculations';
 import { useSheetPersistence } from '../hooks/useSheetPersistence';
 import { TotalsView } from '../components/ExpenseSheet/TotalsView';
+import { DEFAULT_EXPENSE_TYPES, JSON_EXPORT_FILENAME } from '../constants/expenseSheet';
+import { buildHashedColorMap, uniqueInsensitive } from '../utils/expenseUtils';
 
 // Lazy load heavy components
 const ChartsView = lazy(() => import('../components/ExpenseSheet/ChartsView').then(m => ({ default: m.ChartsView })));
-
-import {
-  red,
-  pink,
-  purple,
-  deepPurple,
-  indigo,
-  blue,
-  lightBlue,
-  cyan,
-  teal,
-  green,
-  lightGreen,
-  lime,
-  yellow,
-  amber,
-  orange,
-  deepOrange,
-  brown,
-} from '@mui/material/colors';
-
-const DEFAULT_EXPENSE_TYPES = ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'];
 
 // Debounced input component to prevent lag while typing
 const DebouncedTextField = memo(function DebouncedTextField({ value, onChange, debounceMs = 400, ...props }) {
@@ -122,49 +102,6 @@ const DebouncedTextField = memo(function DebouncedTextField({ value, onChange, d
   );
 });
 
-const SWATCHES = [
-  red[700],
-  pink[600],
-  purple[600],
-  deepPurple[600],
-  indigo[600],
-  blue[700],
-  lightBlue[700],
-  cyan[700],
-  teal[700],
-  green[700],
-  lightGreen[700],
-  lime[800],
-  yellow[800],
-  amber[800],
-  orange[800],
-  deepOrange[800],
-  brown[600],
-];
-
-const hashString = (value) => {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-};
-
-const buildTypeColorMap = (typeNames) => {
-  const names = Array.from(new Set(typeNames.filter(Boolean)));
-  if (names.length === 0) return {};
-  const start = hashString(names.join('|')) % SWATCHES.length;
-  const map = {};
-  names.forEach((name, index) => {
-    map[name] = SWATCHES[(start + index) % SWATCHES.length];
-  });
-  return map;
-};
-
-const formatINR = (amount) => {
-  const value = Number(amount) || 0;
-  return value.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-};
 
 function ExpenseSheet() {
   const location = useLocation();
@@ -281,20 +218,20 @@ function ExpenseSheet() {
     };
   }, [sheetName, initialParties.length, importedExpenses.length, navigate, locationState.expenseTypes]);
 
-  const handleOpenDrawer = () => setDrawerOpen(true);
-  const handleCloseDrawer = () => setDrawerOpen(false);
+  const handleOpenDrawer = useCallback(() => setDrawerOpen(true), []);
+  const handleCloseDrawer = useCallback(() => setDrawerOpen(false), []);
 
-  const handleStartRename = () => {
+  const handleStartRename = useCallback(() => {
     setSheetNameInput(sheetName);
     setEditingSheetName(true);
-  };
+  }, [sheetName]);
 
-  const handleCancelRename = () => {
+  const handleCancelRename = useCallback(() => {
     setEditingSheetName(false);
     setSheetNameInput(sheetName);
-  };
+  }, [sheetName]);
 
-  const handleConfirmRename = async () => {
+  const handleConfirmRename = useCallback(async () => {
     const trimmed = sheetNameInput.trim();
     if (!trimmed) {
       setError('Sheet name is required');
@@ -316,36 +253,26 @@ function ExpenseSheet() {
     } catch {
       setError('Could not rename sheet');
     }
-  };
+  }, [sheetNameInput, sheetName]);
 
-  const handleCloseError = () => setError('');
+  const handleCloseError = useCallback(() => setError(''), []);
 
-  const openEditNames = () => {
+  const openEditNames = useCallback(() => {
     setDraftParties(parties);
     setDraftExpenseTypes(expenseTypes);
     setEditNamesOpen(true);
-  };
+  }, [parties, expenseTypes]);
 
-  const closeEditNames = () => {
+  const closeEditNames = useCallback(() => {
     setEditNamesOpen(false);
-  };
+  }, []);
 
-  const saveEditedNames = () => {
+  const saveEditedNames = useCallback(() => {
     const nextPartiesRaw = Array.isArray(draftParties) ? draftParties : [];
     const nextTypesRaw = Array.isArray(draftExpenseTypes) ? draftExpenseTypes : [];
 
     const nextParties = nextPartiesRaw.map((p) => String(p ?? '').trim()).filter(Boolean);
     const nextTypes = nextTypesRaw.map((t) => String(t ?? '').trim()).filter(Boolean);
-
-    const uniqueInsensitive = (items) => {
-      const seen = new Set();
-      for (const item of items) {
-        const key = item.toLowerCase();
-        if (seen.has(key)) return false;
-        seen.add(key);
-      }
-      return true;
-    };
 
     if (nextParties.length === 0) {
       setError('At least one party is required');
@@ -402,7 +329,7 @@ function ExpenseSheet() {
     }
 
     setEditNamesOpen(false);
-  };
+  }, [draftParties, draftExpenseTypes, expenseTypes, parties]);
 
   const addExpense = useCallback(() => {
     setExpenses((prev) => [...prev, {
@@ -436,17 +363,17 @@ function ExpenseSheet() {
     });
   }, []);
 
-  const startCreateType = (expenseId) => {
+  const startCreateType = useCallback((expenseId) => {
     setNewTypeForExpenseId(expenseId);
     setNewTypeName('');
-  };
+  }, []);
 
-  const cancelCreateType = () => {
+  const cancelCreateType = useCallback(() => {
     setNewTypeForExpenseId(null);
     setNewTypeName('');
-  };
+  }, []);
 
-  const confirmCreateType = () => {
+  const confirmCreateType = useCallback(() => {
     const candidate = newTypeName.trim();
     if (!candidate) return;
     const exists = expenseTypes.some((t) => t.toLowerCase() === candidate.toLowerCase());
@@ -458,19 +385,19 @@ function ExpenseSheet() {
       updateExpense(newTypeForExpenseId, 'type', finalType);
     }
     cancelCreateType();
-  };
+  }, [cancelCreateType, expenseTypes, newTypeForExpenseId, newTypeName, updateExpense]);
 
-  const startCreateParty = (expenseId) => {
+  const startCreateParty = useCallback((expenseId) => {
     setNewPartyForExpenseId(expenseId);
     setNewPartyName('');
-  };
+  }, []);
 
-  const cancelCreateParty = () => {
+  const cancelCreateParty = useCallback(() => {
     setNewPartyForExpenseId(null);
     setNewPartyName('');
-  };
+  }, []);
 
-  const confirmCreateParty = () => {
+  const confirmCreateParty = useCallback(() => {
     const candidate = newPartyName.trim();
     if (!candidate) return;
 
@@ -486,36 +413,36 @@ function ExpenseSheet() {
     }
 
     cancelCreateParty();
-  };
+  }, [cancelCreateParty, newPartyForExpenseId, newPartyName, parties, updateExpense]);
 
-  const openSplitBetween = (expenseId) => {
+  const openSplitBetween = useCallback((expenseId) => {
     const exp = expenses.find((e) => e.id === expenseId);
     const existing = Array.isArray(exp?.splitParties) && exp.splitParties.length > 0 ? exp.splitParties : parties;
     setSplitBetweenSelection(existing);
     setSplitBetweenForExpenseId(expenseId);
-  };
+  }, [expenses, parties]);
 
-  const closeSplitBetween = () => {
+  const closeSplitBetween = useCallback(() => {
     setSplitBetweenForExpenseId(null);
     setSplitBetweenSelection([]);
-  };
+  }, []);
 
-  const toggleSplitParty = (party) => {
+  const toggleSplitParty = useCallback((party) => {
     setSplitBetweenSelection((prev) =>
       prev.includes(party) ? prev.filter((p) => p !== party) : [...prev, party],
     );
-  };
+  }, []);
 
-  const splitBetweenCheckAll = () => setSplitBetweenSelection(parties);
-  const splitBetweenUncheckAll = () => setSplitBetweenSelection([]);
+  const splitBetweenCheckAll = useCallback(() => setSplitBetweenSelection(parties), [parties]);
+  const splitBetweenUncheckAll = useCallback(() => setSplitBetweenSelection([]), []);
 
-  const confirmSplitBetween = () => {
+  const confirmSplitBetween = useCallback(() => {
     if (!splitBetweenForExpenseId) return;
     if (splitBetweenSelection.length === 0) return;
     updateExpense(splitBetweenForExpenseId, 'paidBy', 'Split Between');
     updateExpense(splitBetweenForExpenseId, 'splitParties', splitBetweenSelection);
     closeSplitBetween();
-  };
+  }, [closeSplitBetween, splitBetweenForExpenseId, splitBetweenSelection, updateExpense]);
 
   const handleExportPDF = useCallback(async () => {
     if (isExportingPDF) return;
@@ -543,7 +470,7 @@ function ExpenseSheet() {
     }
   }, [isExportingExcel, sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses]);
 
-  const exportToJSON = () => {
+  const exportToJSON = useCallback(() => {
     const data = {
       name: sheetName,
       parties,
@@ -554,13 +481,13 @@ function ExpenseSheet() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'split-money-data.json';
+    a.download = JSON_EXPORT_FILENAME;
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, [sheetName, parties, expenses, expenseTypes]);
 
   const typeColorMap = useMemo(
-    () => buildTypeColorMap(typeBreakdown.map((t) => t.name)),
+    () => buildHashedColorMap(typeBreakdown.map((t) => t.name)),
     [typeBreakdown]
   );
 

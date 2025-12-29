@@ -1,78 +1,13 @@
 import { memo, useState, useCallback, useMemo } from 'react';
 import { Box, FormControl, InputLabel, Select, MenuItem, Typography } from '@mui/material';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-
-const SWATCHES = [
-  '#2196F3', '#F44336', '#4CAF50', '#FF9800', '#9C27B0',
-  '#00BCD4', '#FFC107', '#E91E63', '#3F51B5', '#8BC34A',
-  '#FF5722', '#009688', '#673AB7', '#CDDC39', '#795548',
-];
-
-const formatINR = (amount) => {
-  const value = Number(amount) || 0;
-  return value.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-};
-
-const parseAmount = (value) => {
-  const num = Number(value);
-  return Number.isNaN(num) ? 0 : num;
-};
-
-const buildTypeColorMap = (typeNames) => {
-  const map = {};
-  const start = 2;
-  typeNames.forEach((name, index) => {
-    map[name] = SWATCHES[(start + index) % SWATCHES.length];
-  });
-  return map;
-};
-
-const calculatePartyTypeBreakdown = (expenses, parties, party) => {
-  const breakdown = {};
-
-  expenses.forEach((exp) => {
-    const cost = parseAmount(exp.cost);
-    if (cost <= 0) return;
-    const type = exp.type || 'Other';
-    const paidBy = exp.paidBy;
-    if (!paidBy) return;
-
-    if (paidBy === 'Split Equally') {
-      const perPerson = cost / parties.length;
-      breakdown[type] = (breakdown[type] || 0) + perPerson;
-      return;
-    }
-
-    if (paidBy === 'Split Between') {
-      const selected = Array.isArray(exp.splitParties) && exp.splitParties.length > 0 
-        ? exp.splitParties 
-        : parties;
-      if (selected.includes(party)) {
-        const perPerson = cost / selected.length;
-        breakdown[type] = (breakdown[type] || 0) + perPerson;
-      }
-      return;
-    }
-
-    if (paidBy === party) {
-      breakdown[type] = (breakdown[type] || 0) + cost;
-    }
-  });
-
-  return Object.entries(breakdown)
-    .map(([name, value]) => ({ name, value }))
-    .filter(item => item.value > 0)
-    .sort((a, b) => b.value - a.value);
-};
-
-const calculatePartyPercentages = (parties, partyTotals) => {
-  const total = Object.values(partyTotals).reduce((sum, t) => sum + (t.total || 0), 0) || 1;
-  return parties.map(party => {
-    const value = partyTotals[party]?.total || 0;
-    const percentage = Math.round((value / total) * 1000) / 10;
-    return { name: party, value, percentage };
-  });
-};
+import { CHART_SWATCHES } from '../../constants/expenseSheet';
+import {
+  buildColorMap,
+  calculatePartyPercentages,
+  calculatePartyTypeBreakdown,
+  formatINR,
+} from '../../utils/expenseUtils';
 
 const ChartSection = memo(function ChartSection({ 
   title, 
@@ -140,7 +75,7 @@ export const ChartsView = memo(function ChartsView({
   const [selectedParty, setSelectedParty] = useState(parties[0] || '');
 
   const typeColorMap = useMemo(
-    () => buildTypeColorMap(typeBreakdown.map((t) => t.name)),
+    () => buildColorMap(typeBreakdown.map((t) => t.name), CHART_SWATCHES, 2),
     [typeBreakdown]
   );
 
@@ -211,7 +146,7 @@ export const ChartsView = memo(function ChartsView({
         <ChartSection
           title="Expense by Type"
           data={typeBreakdown}
-          colors={typeBreakdown.map(entry => typeColorMap[entry.name] || SWATCHES[0])}
+          colors={typeBreakdown.map((entry) => typeColorMap[entry.name] || CHART_SWATCHES[0])}
         />
       )}
 
@@ -219,7 +154,7 @@ export const ChartsView = memo(function ChartsView({
         <ChartSection
           title="Party Split Percentage"
           data={partyPercentages}
-          colors={parties.map((_, idx) => SWATCHES[idx % SWATCHES.length])}
+          colors={parties.map((_, idx) => CHART_SWATCHES[idx % CHART_SWATCHES.length])}
           showPercentage
         />
       )}
@@ -228,7 +163,7 @@ export const ChartsView = memo(function ChartsView({
         <ChartSection
           title={`${selectedParty} - Expense by Type`}
           data={partyBreakdownData}
-          colors={partyBreakdownData.map(entry => typeColorMap[entry.name] || SWATCHES[0])}
+          colors={partyBreakdownData.map((entry) => typeColorMap[entry.name] || CHART_SWATCHES[0])}
         />
       )}
     </Box>

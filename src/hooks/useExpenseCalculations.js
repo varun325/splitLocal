@@ -1,9 +1,5 @@
 import { useMemo } from 'react';
-
-const parseAmount = (value) => {
-  const num = Number(value);
-  return Number.isNaN(num) ? 0 : num;
-};
+import { parseAmount } from '../utils/expenseUtils';
 
 export const useExpenseCalculations = (expenses, parties) => {
   const partyTotals = useMemo(() => {

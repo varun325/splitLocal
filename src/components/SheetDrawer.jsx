@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -16,6 +16,13 @@ import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import { listSheets, loadSheet } from '../storage/splitMoneyStore';
+import {
+  CREATE_SHEET_TEXT,
+  DRAWER_BORDER_COLOR,
+  NO_SHEETS_TEXT,
+  SHEET_DRAWER_TITLE,
+  SHEET_DRAWER_WIDTH,
+} from '../constants/sheetDrawer';
 
 export default function SheetDrawer({ open, onClose, currentSheetName }) {
   const [sheets, setSheets] = useState([]);
@@ -27,7 +34,7 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
     }
   }, [open]);
 
-  const openSheet = async (name) => {
+  const openSheet = useCallback(async (name) => {
     try {
       const sheet = await loadSheet(name);
       if (sheet) {
@@ -37,12 +44,12 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
     } catch {
       // ignore
     }
-  };
+  }, [navigate, onClose]);
 
-  const createNew = () => {
+  const createNew = useCallback(() => {
     navigate('/');
     onClose();
-  };
+  }, [navigate, onClose]);
 
   return (
     <Drawer
@@ -51,7 +58,7 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
       onClose={onClose}
       PaperProps={{
         sx: {
-          width: 320,
+          width: SHEET_DRAWER_WIDTH,
         },
       }}
     >
@@ -61,11 +68,11 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '2px solid var(--color-gray-100)',
+          borderBottom: DRAWER_BORDER_COLOR,
         }}
       >
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Sheets
+          {SHEET_DRAWER_TITLE}
         </Typography>
         <IconButton onClick={onClose} size="small">
           <CloseIcon />
@@ -75,7 +82,7 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
       <List sx={{ flex: 1, overflow: 'auto' }}>
         {sheets.length === 0 && (
           <ListItem>
-            <ListItemText secondary="No sheets yet" />
+            <ListItemText secondary={NO_SHEETS_TEXT} />
           </ListItem>
         )}
         {sheets.map((name) => (
@@ -117,7 +124,7 @@ export default function SheetDrawer({ open, onClose, currentSheetName }) {
           <ListItemIcon sx={{ minWidth: 40 }}>
             <AddIcon />
           </ListItemIcon>
-          <ListItemText primary="Create new sheet" />
+          <ListItemText primary={CREATE_SHEET_TEXT} />
         </ListItemButton>
       </Box>
     </Drawer>
