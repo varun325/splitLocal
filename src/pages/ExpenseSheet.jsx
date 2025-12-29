@@ -1514,8 +1514,10 @@ function ExpenseSheet() {
         <Suspense fallback={null}>
           <PDFExporter>
             {({ generatePDF }) => {
-              generatePDF(sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses);
-              setIsExportingPDF(false);
+              (async () => {
+                await generatePDF(sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses);
+                setIsExportingPDF(false);
+              })();
               return null;
             }}
           </PDFExporter>

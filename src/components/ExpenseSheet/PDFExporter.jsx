@@ -1,21 +1,22 @@
 import { memo } from 'react';
+import PropTypes from 'prop-types';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-import illustration from '../assets/Innovation-bro.svg?url';
+import autoTable from 'jspdf-autotable';
+
+const illustration = '/images/Innovation-bro.svg';
 
 const formatINR = (amount) => {
   const value = Number(amount) || 0;
   return value.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 };
 
-export const generatePDF = (sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses) => {
+export const generatePDF = async (sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
 
-  // Color palette
+  // Color palette (restored)
   const CREAM = '#F6F0D7';
-  const LIGHT_GREEN = '#C5D89D';
   const MEDIUM_GREEN = '#9CAB84';
   const OLIVE = '#89986D';
 
@@ -23,18 +24,35 @@ export const generatePDF = (sheetName, expenses, parties, partyTotals, typeBreak
   doc.setFillColor(CREAM);
   doc.rect(0, 0, pageWidth, 50, 'F');
 
-  // Illustration
-  const illustrationSize = 120;
-  const illustrationX = pageWidth - 150;
-  const illustrationY = 10;
-
-  const img = new Image();
-  img.src = illustration;
-
-  try {
-    doc.addImage(img, 'SVG', illustrationX, illustrationY, illustrationSize, illustrationSize, undefined, 'NONE', 0, 25);
-  } catch (err) {
-    console.warn('Could not add illustration:', err);
+  // Illustration (convert SVG to PNG to avoid jsPDF SVG limitation)
+  const res = await fetch(illustration).catch(() => null);
+  if (res) {
+    const svgText = await res.text().catch(() => null);
+    if (svgText) {
+      const blob = new Blob([svgText], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      const loaded = await new Promise((resolve) => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = url;
+      });
+      if (loaded) {
+        const size = 120;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, size, size);
+          const pngData = canvas.toDataURL('image/png');
+          const illustrationX = pageWidth - 150;
+          const illustrationY = 10;
+          doc.addImage(pngData, 'PNG', illustrationX, illustrationY, size, size, undefined, 'NONE');
+        }
+      }
+      URL.revokeObjectURL(url);
+    }
   }
 
   // Title
@@ -79,7 +97,7 @@ export const generatePDF = (sheetName, expenses, parties, partyTotals, typeBreak
     exp.paidBy || '',
   ]);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Description', 'Cost', 'Type', 'Paid By']],
     body: tableData,
@@ -119,7 +137,7 @@ export const generatePDF = (sheetName, expenses, parties, partyTotals, typeBreak
     return [party, formatINR(totals.direct), formatINR(totals.split), formatINR(totals.total)];
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Party', 'Direct', 'Split', 'Total']],
     body: partyData,
@@ -156,7 +174,7 @@ export const generatePDF = (sheetName, expenses, parties, partyTotals, typeBreak
 
   const typeData = typeBreakdown.map((item) => [item.name, formatINR(item.value)]);
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Type', 'Amount']],
     body: typeData,
@@ -184,3 +202,7 @@ export const generatePDF = (sheetName, expenses, parties, partyTotals, typeBreak
 export const PDFExporter = memo(function PDFExporter({ children, ...props }) {
   return children({ generatePDF, ...props });
 });
+
+PDFExporter.propTypes = {
+  children: PropTypes.func.isRequired,
+};
