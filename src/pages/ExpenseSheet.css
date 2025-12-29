@@ -1,7 +1,30 @@
 .expense-sheet {
   min-height: 100vh;
   background-color: var(--color-gray-50);
+  background-image: url('/images/pawel-czerwinski-FyBMuAMfQzc-unsplash.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-blend-mode: overlay;
   padding: var(--spacing-xl);
+  position: relative;
+}
+
+.expense-sheet::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(248, 250, 252, 0.92);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.expense-sheet > * {
+  position: relative;
+  z-index: 1;
 }
 
 .sheet-header {
@@ -11,30 +34,55 @@
   margin-bottom: var(--spacing-xl);
   padding: var(--spacing-xl);
   background-color: #ffffff;
+  background-image: url('/images/Innovation-bro.svg');
+  background-size: 280px;
+  background-position: right -40px center;
+  background-repeat: no-repeat;
   border-radius: var(--border-radius-lg);
   box-shadow: var(--shadow-md);
   border: 1px solid var(--color-gray-200);
+  position: relative;
+  overflow: hidden;
+}
+
+.sheet-header::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 300px;
+  background: linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,0) 100%);
+  pointer-events: none;
 }
 
 .sheet-header h1 {
   margin-bottom: var(--spacing-xs);
   color: var(--color-ink);
+  position: relative;
+  z-index: 2;
 }
 
 .sheet-title {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
+  position: relative;
+  z-index: 2;
 }
 
 .subtitle {
   color: var(--color-text-secondary);
+  position: relative;
+  z-index: 2;
 }
 
 .header-actions {
   display: flex;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
 }
 
 .btn-export {

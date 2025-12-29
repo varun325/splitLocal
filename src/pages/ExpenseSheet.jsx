@@ -1229,12 +1229,24 @@ function ExpenseSheet() {
         fullWidth
         maxWidth="xs"
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
           <PeopleAltOutlinedIcon sx={{ color: 'var(--color-primary)' }} />
           Split Between
         </DialogTitle>
         <DialogContent>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            mb: 2,
+            '& img': {
+              width: '140px',
+              height: 'auto',
+              opacity: 0.9,
+            }
+          }}>
+            <img src="/images/Saving money-pana.svg" alt="Split expenses" />
+          </Box>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, textAlign: 'center' }}>
             Choose which parties share this expense.
           </Typography>
 
