@@ -204,6 +204,10 @@ function ExpenseSheet() {
   const [newPartyForExpenseId, setNewPartyForExpenseId] = useState(null);
   const [newPartyName, setNewPartyName] = useState('');
 
+  const [editNamesOpen, setEditNamesOpen] = useState(false);
+  const [draftParties, setDraftParties] = useState([]);
+  const [draftExpenseTypes, setDraftExpenseTypes] = useState([]);
+
   const [splitBetweenForExpenseId, setSplitBetweenForExpenseId] = useState(null);
   const [splitBetweenSelection, setSplitBetweenSelection] = useState([]);
 
@@ -309,6 +313,90 @@ function ExpenseSheet() {
   };
 
   const handleCloseError = () => setError('');
+
+  const openEditNames = () => {
+    setDraftParties(parties);
+    setDraftExpenseTypes(expenseTypes);
+    setEditNamesOpen(true);
+  };
+
+  const closeEditNames = () => {
+    setEditNamesOpen(false);
+  };
+
+  const saveEditedNames = () => {
+    const nextPartiesRaw = Array.isArray(draftParties) ? draftParties : [];
+    const nextTypesRaw = Array.isArray(draftExpenseTypes) ? draftExpenseTypes : [];
+
+    const nextParties = nextPartiesRaw.map((p) => String(p ?? '').trim()).filter(Boolean);
+    const nextTypes = nextTypesRaw.map((t) => String(t ?? '').trim()).filter(Boolean);
+
+    const uniqueInsensitive = (items) => {
+      const seen = new Set();
+      for (const item of items) {
+        const key = item.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+      return true;
+    };
+
+    if (nextParties.length === 0) {
+      setError('At least one party is required');
+      return;
+    }
+    if (!uniqueInsensitive(nextParties)) {
+      setError('Party names must be unique');
+      return;
+    }
+    if (nextTypes.length === 0) {
+      setError('At least one expense type is required');
+      return;
+    }
+    if (!uniqueInsensitive(nextTypes)) {
+      setError('Expense types must be unique');
+      return;
+    }
+
+    const partyRenameMap = new Map();
+    for (let i = 0; i < parties.length; i += 1) {
+      const oldName = parties[i];
+      const newName = nextParties[i] ?? oldName;
+      if (oldName && newName && oldName !== newName) partyRenameMap.set(oldName, newName);
+    }
+
+    const typeRenameMap = new Map();
+    for (let i = 0; i < expenseTypes.length; i += 1) {
+      const oldType = expenseTypes[i];
+      const newType = nextTypes[i] ?? oldType;
+      if (oldType && newType && oldType !== newType) typeRenameMap.set(oldType, newType);
+    }
+
+    setParties(nextParties);
+    setExpenseTypes(nextTypes);
+
+    if (partyRenameMap.size > 0 || typeRenameMap.size > 0) {
+      setExpenses((prev) =>
+        prev.map((exp) => {
+          const paidBy = partyRenameMap.get(exp.paidBy) ?? exp.paidBy;
+          const splitParties = Array.isArray(exp.splitParties)
+            ? exp.splitParties.map((p) => partyRenameMap.get(p) ?? p)
+            : exp.splitParties;
+          const type = typeRenameMap.get(exp.type) ?? exp.type;
+
+          return { ...exp, paidBy, splitParties, type };
+        })
+      );
+
+      setSplitBetweenSelection((prev) =>
+        Array.isArray(prev) ? prev.map((p) => partyRenameMap.get(p) ?? p) : prev
+      );
+
+      setSelectedParty((prev) => partyRenameMap.get(prev) ?? prev);
+    }
+
+    setEditNamesOpen(false);
+  };
 
   const addExpense = useCallback(() => {
     setExpenses((prev) => [...prev, {
@@ -994,6 +1082,13 @@ function ExpenseSheet() {
           >
             Save Data
           </Button>
+          <Button
+            onClick={openEditNames}
+            variant="outlined"
+            startIcon={<EditOutlinedIcon />}
+          >
+            Edit parties/types
+          </Button>
         </div>
       </div>
 
@@ -1038,7 +1133,6 @@ function ExpenseSheet() {
                               variant="outlined"
                               size="small"
                               fullWidth
-                              InputProps={{ sx: { borderRadius: 0 } }}
                             />
                           </div>
                           <div className="col-cost">
@@ -1051,7 +1145,7 @@ function ExpenseSheet() {
                               size="small"
                               fullWidth
                               inputProps={{ step: '0.01' }}
-                              InputProps={{ sx: { borderRadius: 0, fontFamily: 'Courier New, monospace' } }}
+                              InputProps={{ sx: { fontFamily: 'Courier New, monospace' } }}
                             />
                           </div>
                           <div className="col-paidby">
@@ -1065,7 +1159,6 @@ function ExpenseSheet() {
                                   size="small"
                                   fullWidth
                                   autoFocus
-                                  InputProps={{ sx: { borderRadius: 0 } }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') confirmCreateParty();
                                     if (e.key === 'Escape') cancelCreateParty();
@@ -1102,7 +1195,6 @@ function ExpenseSheet() {
                                 size="small"
                                 fullWidth
                                 displayEmpty
-                                sx={{ borderRadius: 0 }}
                               >
                                 <MenuItem value=""><em>Select…</em></MenuItem>
                                 <MenuItem value="Split Equally">Split Equally</MenuItem>
@@ -1126,7 +1218,6 @@ function ExpenseSheet() {
                                   size="small"
                                   fullWidth
                                   autoFocus
-                                  InputProps={{ sx: { borderRadius: 0 } }}
                                   onKeyDown={(e) => {
                                     if (e.key === 'Enter') confirmCreateType();
                                     if (e.key === 'Escape') cancelCreateType();
@@ -1152,7 +1243,6 @@ function ExpenseSheet() {
                                 }}
                                 size="small"
                                 fullWidth
-                                sx={{ borderRadius: 0 }}
                               >
                                 {expenseTypes.map((type) => (
                                   <MenuItem key={type} value={type}>{type}</MenuItem>
@@ -1526,6 +1616,60 @@ function ExpenseSheet() {
             disabled={splitBetweenSelection.length === 0}
           >
             Done
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={editNamesOpen}
+        onClose={closeEditNames}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Edit parties & expense types</DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography variant="subtitle2" sx={{ mt: 1, mb: 1, fontWeight: 700, color: 'text.secondary' }}>
+            Parties
+          </Typography>
+          <Box sx={{ display: 'grid', gap: 1 }}>
+            {draftParties.map((p, idx) => (
+              <TextField
+                key={`${p}-${idx}`}
+                value={p}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDraftParties((prev) => prev.map((x, i) => (i === idx ? v : x)));
+                }}
+                size="small"
+                fullWidth
+              />
+            ))}
+          </Box>
+
+          <Typography variant="subtitle2" sx={{ mt: 3, mb: 1, fontWeight: 700, color: 'text.secondary' }}>
+            Expense types
+          </Typography>
+          <Box sx={{ display: 'grid', gap: 1 }}>
+            {draftExpenseTypes.map((t, idx) => (
+              <TextField
+                key={`${t}-${idx}`}
+                value={t}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setDraftExpenseTypes((prev) => prev.map((x, i) => (i === idx ? v : x)));
+                }}
+                size="small"
+                fullWidth
+              />
+            ))}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button onClick={closeEditNames} variant="outlined" startIcon={<CloseIcon />}>
+            Cancel
+          </Button>
+          <Button onClick={saveEditedNames} variant="contained" startIcon={<CheckIcon />}>
+            Save
           </Button>
         </DialogActions>
       </Dialog>
