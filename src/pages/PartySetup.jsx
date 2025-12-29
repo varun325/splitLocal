@@ -50,8 +50,8 @@ function PartySetup() {
     }
 
     const validParties = parties.filter((p) => p.trim() !== '');
-    if (validParties.length < 2) {
-      setError('Please add at least 2 parties');
+    if (validParties.length < 1) {
+      setError('Please add at least 1 party');
       return;
     }
 
@@ -177,12 +177,18 @@ function PartySetup() {
                         onClick={() => removeParty(index)}
                         aria-label="Remove party"
                         sx={{
-                          border: '1px solid',
-                          borderColor: 'error.main',
+                          width: 56,
+                          height: 56,
+                          borderRadius: '14px',
+                          border: '1.5px solid',
+                          borderColor: 'error.light',
                           color: 'error.main',
+                          bgcolor: 'rgba(244, 67, 54, 0.06)',
+                          transition: 'all 0.2s ease',
                           '&:hover': {
-                            bgcolor: 'error.main',
-                            color: 'white',
+                            bgcolor: 'error.light',
+                            color: '#fff',
+                            borderColor: 'error.main',
                           },
                         }}
                       >
