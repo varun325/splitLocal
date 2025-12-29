@@ -64,6 +64,13 @@ import {
 
 const DEFAULT_EXPENSE_TYPES = ['Food', 'Transport', 'Accommodation', 'Entertainment', 'Shopping', 'Other'];
 
+const parseAmount = (value) => {
+  if (value === null || value === undefined) return 0;
+  const cleaned = String(value).replace(/,/g, '').trim();
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+};
+
 const formatINRNumber = (amount) => {
   const value = Number(amount) || 0;
   return new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
@@ -274,7 +281,7 @@ function ExpenseSheet() {
     });
 
     expenses.forEach((expense) => {
-      const cost = parseFloat(expense.cost) || 0;
+      const cost = parseAmount(expense.cost);
       const paidBy = expense.paidBy;
       if (!paidBy || cost <= 0) return;
 
@@ -314,7 +321,7 @@ function ExpenseSheet() {
   const calculateTypeBreakdown = () => {
     const breakdown = {};
     expenses.forEach(expense => {
-      const cost = parseFloat(expense.cost) || 0;
+      const cost = parseAmount(expense.cost);
       if (cost > 0 && expense.type) {
         breakdown[expense.type] = (breakdown[expense.type] || 0) + cost;
       }
@@ -540,18 +547,22 @@ function ExpenseSheet() {
     }).sort((a, b) => b.total - a.total);
 
     // Party totals table
+    const partyCol0 = Math.floor(contentWidth * 0.46);
+    const partyNum = Math.floor((contentWidth - partyCol0) / 3);
+    const partyLast = contentWidth - partyCol0 - partyNum * 2;
     autoTable(doc, {
       startY: cursorY,
       margin: { left: margin, right: margin },
+      tableWidth: contentWidth,
       head: [['Party', 'Direct', 'Split', 'Total']],
       body: partyRows.map((r) => [r.party, formatINRForPdf(r.direct), formatINRForPdf(r.split), formatINRForPdf(r.total)]),
       styles: { font: 'helvetica', fontSize: 10, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1 },
       headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
       columnStyles: {
-        0: { cellWidth: 240 },
-        1: { cellWidth: 110, halign: 'right' },
-        2: { cellWidth: 110, halign: 'right' },
-        3: { cellWidth: 110, halign: 'right' },
+        0: { cellWidth: partyCol0 },
+        1: { cellWidth: partyNum, halign: 'right' },
+        2: { cellWidth: partyNum, halign: 'right' },
+        3: { cellWidth: partyLast, halign: 'right' },
       },
     });
 
@@ -595,6 +606,41 @@ function ExpenseSheet() {
       });
     };
 
+    const computePartyTypeBreakdowns = () => {
+      const map = {};
+      parties.forEach((p) => { map[p] = {}; });
+
+      expenses.forEach((exp) => {
+        const cost = parseAmount(exp.cost);
+        if (cost <= 0) return;
+        const type = exp.type || 'Other';
+        const paidBy = exp.paidBy;
+        if (!paidBy) return;
+
+        if (paidBy === 'Split Equally') {
+          const per = cost / Math.max(parties.length, 1);
+          parties.forEach((p) => { map[p][type] = (map[p][type] || 0) + per; });
+          return;
+        }
+
+        if (paidBy === 'Split Between') {
+          const selected = Array.isArray(exp.splitParties) && exp.splitParties.length > 0 ? exp.splitParties : parties;
+          const per = cost / Math.max(selected.length, 1);
+          selected.forEach((p) => {
+            if (!map[p]) map[p] = {};
+            map[p][type] = (map[p][type] || 0) + per;
+          });
+          return;
+        }
+
+        if (map[paidBy]) {
+          map[paidBy][type] = (map[paidBy][type] || 0) + cost;
+        }
+      });
+
+      return map;
+    };
+
     const drawChartBlock = (title, slices) => {
       cursorY = ensureSpace(320, cursorY);
       doc.setFont('helvetica', 'bold');
@@ -621,18 +667,24 @@ function ExpenseSheet() {
 
       const legendStartY = imgY + imgH + 12;
       const legendRows = buildLegendRows(slices);
+
+      const colorW = 18;
+      const shareW = 70;
+      const amountW = 150;
+      const categoryW = contentWidth - colorW - amountW - shareW;
       autoTable(doc, {
         startY: legendStartY,
         margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
         head: [['', 'Category', 'Amount', 'Share']],
         body: legendRows,
         styles: { font: 'helvetica', fontSize: 9, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1 },
         headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
         columnStyles: {
-          0: { cellWidth: 18 },
-          1: { cellWidth: 250 },
-          2: { cellWidth: 150, halign: 'right' },
-          3: { cellWidth: 70, halign: 'right' },
+          0: { cellWidth: colorW },
+          1: { cellWidth: categoryW },
+          2: { cellWidth: amountW, halign: 'right' },
+          3: { cellWidth: shareW, halign: 'right' },
         },
         didDrawCell: (data) => {
           if (data.section !== 'body') return;
@@ -668,6 +720,16 @@ function ExpenseSheet() {
     drawChartBlock('By Type', typeSlices);
     drawChartBlock('By Party', partySlices);
 
+    const partyType = computePartyTypeBreakdowns();
+    parties.forEach((party) => {
+      const typeMap = partyType[party] || {};
+      const slices = makeSlices(
+        Object.entries(typeMap).map(([label, value]) => ({ label, value })),
+        (it) => typeColorMap[it.label] || SWATCHES[0],
+      );
+      drawChartBlock(`${party} — By Type`, slices);
+    });
+
     // Expenses table (new page for readability)
     doc.addPage();
     doc.setTextColor(17, 17, 17);
@@ -683,26 +745,33 @@ function ExpenseSheet() {
         String(idx + 1),
         exp.name || '-',
         exp.type || '-',
-        formatINRForPdf(parseFloat(exp.cost) || 0),
+        formatINRForPdf(parseAmount(exp.cost)),
         exp.paidBy || '-',
         splitPartiesStr,
       ];
     });
 
+    const expNumW = 24;
+    const expCostW = 92;
+    const expTypeW = 90;
+    const expPaidW = 92;
+    const expSplitW = 130;
+    const expNameW = contentWidth - expNumW - expTypeW - expCostW - expPaidW - expSplitW;
     autoTable(doc, {
       startY: margin + 12,
       margin: { left: margin, right: margin },
+      tableWidth: contentWidth,
       head: [['#', 'Expense', 'Type', 'Cost', 'Paid By', 'Split Parties']],
       body: expenseRows,
       styles: { font: 'helvetica', fontSize: 9, cellPadding: 6, lineColor: [235, 235, 235], lineWidth: 1, overflow: 'linebreak' },
       headStyles: { fillColor: [245, 245, 245], textColor: [17, 17, 17], fontStyle: 'bold' },
       columnStyles: {
-        0: { cellWidth: 22, halign: 'right' },
-        1: { cellWidth: 170 },
-        2: { cellWidth: 90 },
-        3: { cellWidth: 70, halign: 'right' },
-        4: { cellWidth: 90 },
-        5: { cellWidth: 120 },
+        0: { cellWidth: expNumW, halign: 'right' },
+        1: { cellWidth: expNameW },
+        2: { cellWidth: expTypeW },
+        3: { cellWidth: expCostW, halign: 'right' },
+        4: { cellWidth: expPaidW },
+        5: { cellWidth: expSplitW },
       },
     });
 
@@ -729,7 +798,7 @@ function ExpenseSheet() {
   const partyTotals = calculatePartyTotals();
   const typeBreakdown = calculateTypeBreakdown();
   const typeColorMap = buildTypeColorMap(typeBreakdown.map((t) => t.name));
-  const totalExpenses = expenses.reduce((sum, exp) => sum + (parseFloat(exp.cost) || 0), 0);
+  const totalExpenses = expenses.reduce((sum, exp) => sum + parseAmount(exp.cost), 0);
 
   if (!parties || parties.length === 0) {
     return null;
