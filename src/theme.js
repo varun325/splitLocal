@@ -123,5 +123,37 @@ export const theme = createTheme({
         },
       },
     },
+    MuiTabs: {
+      styleOverrides: {
+        root: {
+          '& .MuiTabs-flexContainer': {
+            gap: 0,
+          },
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 500,
+          fontSize: '0.9375rem',
+          minHeight: 48,
+          '&.MuiTab-root': {
+            borderRight: 'none',
+          },
+          '&:not(:last-child)': {
+            borderRight: 'none',
+          },
+        },
+      },
+    },
+    MuiTabScrollButton: {
+      styleOverrides: {
+        root: {
+          display: 'none',
+        },
+      },
+    },
   },
 });

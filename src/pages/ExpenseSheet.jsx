@@ -18,10 +18,10 @@ import {
   Select,
   TextField,
   Typography,
-  Tabs,
-  Tab,
   FormControl,
   InputLabel,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -1200,34 +1200,48 @@ function ExpenseSheet() {
 
         <div className="summary-section">
           <div className="summary-card">
-            <Tabs 
-              value={summaryTab} 
-              onChange={(e, val) => setSummaryTab(val)}
-              sx={{ 
-                borderBottom: 1, 
-                borderColor: 'divider', 
-                mb: 2,
-                '& .MuiTab-root': {
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.95rem',
-                  minHeight: 48,
-                  '&.Mui-selected': {
-                    color: 'primary.main',
-                  }
-                },
-                '& .MuiTabs-indicator': {
-                  height: 3,
-                  borderRadius: '3px 3px 0 0',
-                }
-              }}
-            >
-              <Tab label="📊 Charts" />
-              <Tab label="💰 Totals" />
-            </Tabs>
-
+            <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+              <div className={`summary-switch ${summaryTab === 0 ? 'is-left' : 'is-right'}`}>
+                <ToggleButtonGroup
+                  value={summaryTab}
+                  exclusive
+                  onChange={(_, next) => {
+                    if (next !== null) setSummaryTab(next);
+                  }}
+                  aria-label="expense summary view"
+                  className="summary-switch-group"
+                >
+                  <ToggleButton value={0} aria-label="charts" disableRipple>
+                    📊 Charts
+                  </ToggleButton>
+                  <ToggleButton value={1} aria-label="totals" disableRipple>
+                    💰 Totals
+                  </ToggleButton>
+                </ToggleButtonGroup>
+              </div>
+            </Box>
             {summaryTab === 0 && (
               <Box>
+                {(() => {
+                  if (chartView === 'party-breakdown' && selectedParty) {
+                    const partyData = calculatePartyTypeBreakdown(deferredExpenses, deferredParties, selectedParty);
+                    const partyTotal = partyData.reduce((sum, item) => sum + item.value, 0);
+                    return (
+                      <div className="chart-total-display">
+                        <div className="chart-total-label">{selectedParty} Total</div>
+                        <div className="chart-total-amount">{formatINR(partyTotal)}</div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="chart-total-display">
+                      <div className="chart-total-label">Total Expenses</div>
+                      <div className="chart-total-amount">{formatINR(totalExpenses)}</div>
+                    </div>
+                  );
+                })()}
+
                 <Box sx={{ mb: 2 }}>
                   <FormControl fullWidth size="small">
                     <InputLabel>View</InputLabel>
@@ -1265,11 +1279,6 @@ function ExpenseSheet() {
 
                 {chartView === 'type' && typeBreakdown.length > 0 && (
                   <Box>
-                    <div className="chart-total-display">
-                      <div className="chart-total-label">Total Expenses</div>
-                      <div className="chart-total-amount">{formatINR(totalExpenses)}</div>
-                    </div>
-
                     <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
                       Expense by Type
                     </Typography>
@@ -1311,11 +1320,6 @@ function ExpenseSheet() {
 
                 {chartView === 'party-percentage' && (
                   <Box>
-                    <div className="chart-total-display">
-                      <div className="chart-total-label">Total Expenses</div>
-                      <div className="chart-total-amount">{formatINR(totalExpenses)}</div>
-                    </div>
-
                     <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
                       Party Split Percentage
                     </Typography>
@@ -1358,14 +1362,8 @@ function ExpenseSheet() {
                   <Box>
                     {(() => {
                       const partyData = calculatePartyTypeBreakdown(deferredExpenses, deferredParties, selectedParty);
-                      const partyTotal = partyData.reduce((sum, item) => sum + item.value, 0);
                       return (
                         <>
-                          <div className="chart-total-display">
-                            <div className="chart-total-label">{selectedParty} Total</div>
-                            <div className="chart-total-amount">{formatINR(partyTotal)}</div>
-                          </div>
-
                           <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600, color: 'text.secondary' }}>
                             {selectedParty} - Expense by Type
                           </Typography>

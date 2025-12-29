@@ -114,6 +114,83 @@
   max-height: calc(100vh - 280px);
 }
 
+/* Animated Charts/Totals switch */
+.summary-switch {
+  --switch-pad: 4px;
+  position: relative;
+  display: inline-flex;
+  padding: var(--switch-pad);
+  border-radius: var(--border-radius-full);
+  background: rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.summary-switch::before {
+  content: '';
+  position: absolute;
+  top: var(--switch-pad);
+  left: var(--switch-pad);
+  width: calc(50% - var(--switch-pad));
+  height: calc(100% - (var(--switch-pad) * 2));
+  background: var(--color-primary);
+  border-radius: var(--border-radius-full);
+  box-shadow:
+    0 10px 20px rgba(37, 99, 235, 0.22),
+    0 2px 6px rgba(15, 23, 42, 0.12);
+  transform: translateX(0%);
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.summary-switch.is-right::before {
+  transform: translateX(100%);
+}
+
+.summary-switch-group {
+  position: relative;
+  z-index: 1;
+}
+
+.summary-switch-group .MuiToggleButtonGroup-grouped {
+  border: 0;
+  margin: 0;
+}
+
+.summary-switch-group .MuiToggleButton-root {
+  border: 0 !important;
+  border-radius: var(--border-radius-full) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  text-transform: none;
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.95rem;
+  padding: 10px 18px;
+  min-width: 150px;
+  color: var(--color-text-secondary);
+  transition: color 160ms ease;
+}
+
+.summary-switch-group .MuiToggleButton-root.Mui-selected {
+  color: #ffffff;
+}
+
+.summary-switch-group .MuiToggleButton-root:hover {
+  background: transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.summary-switch-group .MuiToggleButton-root:focus {
+  outline: none !important;
+}
+
+.summary-switch-group .MuiToggleButton-root:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.35) !important;
+  outline-offset: 2px;
+}
+
 .expense-list-container {
   flex: 1;
   overflow-y: auto;
@@ -401,28 +478,48 @@
 }
 
 .chart-total-display {
+  position: relative;
   text-align: center;
-  padding: var(--spacing-md);
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
-  border-radius: var(--border-radius-md);
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--border-radius-lg);
   margin-bottom: var(--spacing-lg);
-  border: 1px solid rgba(102, 126, 234, 0.2);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.chart-total-display::before {
+  content: '';
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  width: 140px;
+  height: 140px;
+  background-image: url('/images/Accountant-amico.svg');
+  background-size: contain;
+  background-repeat: no-repeat;
+  opacity: 0.25;
+  pointer-events: none;
 }
 
 .chart-total-label {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--color-gray-600);
+  color: rgba(255, 255, 255, 0.9);
   margin-bottom: var(--spacing-xs);
+  position: relative;
+  z-index: 1;
 }
 
 .chart-total-amount {
-  font-size: 1.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   font-family: 'Courier New', monospace;
-  color: var(--color-primary);
+  color: white;
+  position: relative;
+  z-index: 1;
 }
 
 .party-name {
