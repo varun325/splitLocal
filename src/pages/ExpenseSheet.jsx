@@ -850,7 +850,7 @@ function ExpenseSheet() {
               opacity: 0.9,
             }
           }}>
-            <img src="/images/Saving money-pana.svg" alt="Split expenses" />
+            <img src={`${import.meta.env.BASE_URL}images/Saving%20money-pana.svg`} alt="Split expenses" />
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2, textAlign: 'center' }}>
             Choose which parties share this expense.

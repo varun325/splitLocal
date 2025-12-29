@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="refresh" content="0; URL=/splitLocal/" />
+    <script>
+      // Single-page app fallback for GitHub Pages
+      // Redirect to the app base while preserving path and query/hash
+      (function() {
+        var l = window.location;
+        var base = '/splitLocal/';
+        var path = l.pathname.replace(/^\/splitLocal\//, '').replace(/^\//, '');
+        var target = base + path + l.search + l.hash;
+        l.replace(target);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>

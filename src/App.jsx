@@ -5,10 +5,12 @@ import ExpenseSheet from './pages/ExpenseSheet';
 import { theme } from './theme';
 
 function App() {
+  const basename = import.meta.env.BASE_URL || '/';
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Router>
+      <Router basename={basename}>
         <Routes>
           <Route path="/" element={<PartySetup />} />
           <Route path="/expenses" element={<ExpenseSheet />} />

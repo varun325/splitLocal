@@ -128,7 +128,7 @@ function PartySetup() {
             Track expenses and split bills with friends, family, or roommates effortlessly
           </Typography>
           <Box className="hero-illustration">
-            <img src="/images/Finance app-cuate.svg" alt="Finance illustration" />
+            <img src={`${import.meta.env.BASE_URL}images/Finance%20app-cuate.svg`} alt="Finance illustration" />
           </Box>
         </Box>
       </Box>

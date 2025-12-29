@@ -15,6 +15,8 @@ const ChartSection = memo(function ChartSection({
   colors, 
   showPercentage = false 
 }) {
+  const sortedData = useMemo(() => [...data].sort((a, b) => b.value - a.value), [data]);
+
   if (!data || data.length === 0) {
     return (
       <Typography variant="body2" sx={{ textAlign: 'center', color: 'text.secondary', py: 4 }}>
@@ -47,7 +49,7 @@ const ChartSection = memo(function ChartSection({
       </ResponsiveContainer>
 
       <div className="chart-legend">
-        {data.sort((a, b) => b.value - a.value).map((item, index) => (
+        {sortedData.map((item, index) => (
           <div key={item.name} className="legend-item">
             <span
               className="legend-swatch"

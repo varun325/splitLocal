@@ -113,7 +113,7 @@ const drawPieToCanvas = ({ slices, colors, size = 520 }) => {
   return canvas;
 };
 
-const illustrationPath = '/images/Innovation-bro.svg';
+const illustrationPath = `${import.meta.env.BASE_URL}images/Innovation-bro.svg`;
 
 export const generatePDF = async (sheetName, expenses, parties, partyTotals, typeBreakdown, totalExpenses) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });

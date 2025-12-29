@@ -1,7 +1,7 @@
 .expense-sheet {
   min-height: 100vh;
   background-color: var(--color-gray-50);
-  background-image: url('/images/pawel-czerwinski-FyBMuAMfQzc-unsplash.jpg');
+  background-image: url('/splitLocal/images/pawel-czerwinski-FyBMuAMfQzc-unsplash.jpg');
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
@@ -34,7 +34,7 @@
   margin-bottom: var(--spacing-xl);
   padding: var(--spacing-xl);
   background-color: #ffffff;
-  background-image: url('/images/Innovation-bro.svg');
+  background-image: url('/splitLocal/images/Innovation-bro.svg');
   background-size: 260px;
   background-position: right -30px center;
   background-repeat: no-repeat;
@@ -448,7 +448,7 @@
   bottom: -20px;
   width: 180px;
   height: 180px;
-  background-image: url('/images/Piggy bank-bro.svg');
+  background-image: url('/splitLocal/images/Piggy bank-bro.svg');
   background-size: contain;
   background-repeat: no-repeat;
   opacity: 0.3;
@@ -495,7 +495,7 @@
   bottom: -20px;
   width: 140px;
   height: 140px;
-  background-image: url('/images/Accountant-amico.svg');
+  background-image: url('/splitLocal/images/Accountant-amico.svg');
   background-size: contain;
   background-repeat: no-repeat;
   opacity: 0.25;
