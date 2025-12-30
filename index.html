@@ -5,8 +5,18 @@
     <link rel="icon" type="image/svg+xml" href="/splitLocal/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>splitlocal</title>
-    <script type="module" crossorigin src="/splitLocal/assets/index-1rgRl8Qf.js"></script>
-    <link rel="stylesheet" crossorigin href="/splitLocal/assets/index-d30RlkQS.css">
+    <script>
+      // GitHub Pages SPA routing: restore path from ?p= query param
+      (function() {
+        var q = window.location.search;
+        if (q && q.indexOf('?p=') === 0) {
+          var path = decodeURIComponent(q.slice(3));
+          window.history.replaceState(null, '', window.location.pathname.replace(/\/$/, '') + '/' + path);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/splitLocal/assets/index-DcC3JUtj.js"></script>
+    <link rel="stylesheet" crossorigin href="/splitLocal/assets/index-B6ZhR3o7.css">
   </head>
   <body>
     <div id="root"></div>

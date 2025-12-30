@@ -1,16 +1,17 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="refresh" content="0; URL=/splitLocal/" />
     <script>
-      // Single-page app fallback for GitHub Pages
-      // Redirect to the app base while preserving path and query/hash
+      // GitHub Pages SPA redirect
+      // Encodes path into query string so index.html can restore it
       (function() {
         var l = window.location;
         var base = '/splitLocal/';
-        var path = l.pathname.replace(/^\/splitLocal\//, '').replace(/^\//, '');
-        var target = base + path + l.search + l.hash;
+        // Get the path after /splitLocal/
+        var path = l.pathname.slice(base.length);
+        // Redirect to base with path encoded in query
+        var target = base + '?p=' + encodeURIComponent(path + l.search + l.hash);
         l.replace(target);
       })();
     </script>
